@@ -4,7 +4,7 @@
 
 <h1>Race Schedule</h1>
 
-<AuthorizeView Roles="TrackAdmin">
+<AuthorizeView Context="auth" Roles="TrackAdmin">
     <div class="card">
         <h3>New race meeting</h3>
         @if (meetingError is not null)

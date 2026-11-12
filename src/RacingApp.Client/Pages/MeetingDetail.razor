@@ -14,7 +14,7 @@ else
         <span class="badge">@meeting.Status</span>
     </p>
 
-    <AuthorizeView Roles="TrackAdmin">
+    <AuthorizeView Context="auth" Roles="TrackAdmin">
         <div class="card">
             <h3>Add race</h3>
             @if (raceError is not null)
@@ -98,7 +98,7 @@ else
                                 <td>@(entry.FinishPosition?.ToString() ?? "-")</td>
                                 <td>@(entry.RaceTimeSeconds?.ToString("0.00") ?? "-")</td>
                                 <td>
-                                    <AuthorizeView Roles="TrackAdmin">
+                                    <AuthorizeView Context="auth" Roles="TrackAdmin">
                                         <button class="secondary" @onclick="() => BeginResult(entry)">Result</button>
                                         <button class="secondary" @onclick="() => Scratch(entry)">Scratch</button>
                                     </AuthorizeView>
@@ -135,7 +135,7 @@ else
                 <p>No entries yet.</p>
             }
 
-            <AuthorizeView Roles="TrackAdmin">
+            <AuthorizeView Context="auth" Roles="TrackAdmin">
                 @if (!raceIdsWithForm.Contains(race.Id))
                 {
                     <button class="secondary" @onclick="() => ShowEntryForm(race.Id)">Add entry</button>

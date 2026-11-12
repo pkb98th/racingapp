@@ -8,7 +8,7 @@
     <input placeholder="Search by name or kennel number..." @bind="search" @bind:after="LoadAsync" />
 </div>
 
-<AuthorizeView Roles="Owner,Trainer,TrackAdmin">
+<AuthorizeView Context="auth" Roles="Owner,Trainer,TrackAdmin">
     <div class="card">
         <h3>Register a racer</h3>
         @if (createError is not null)
