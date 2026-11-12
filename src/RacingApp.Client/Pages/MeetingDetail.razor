@@ -1,5 +1,5 @@
 @page "/meetings/{Id:int}"
-@attribute [Microsoft.AspNetCore.Components.Authorization.Authorize]
+@attribute [Authorize]
 @inject ApiClient Api
 
 @if (meeting is null)
