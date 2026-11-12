@@ -76,6 +76,16 @@ Client API base URL is configured in `src/RacingApp.Client/wwwroot/appsettings.j
 
 > Change `Jwt:Key` before any deployment, and move secrets to user-secrets or environment variables.
 
+## Smoke test
+
+With the API running, verify the seeded data, role restrictions, and the full meeting → race → entry → result and injury → treatment flows:
+
+```bash
+./scripts/smoke-test.sh
+```
+
+It prints PASS/FAIL per check and exits non-zero if anything fails.
+
 ## Roadmap ideas
 
 - Per-stakeholder dashboards with notifications (injury alerts, upcoming races)
