@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using RacingApp.Shared.Dtos;
 
 namespace RacingApp.Client.Services;
 
