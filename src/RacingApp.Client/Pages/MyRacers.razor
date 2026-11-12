@@ -1,5 +1,5 @@
 @page "/my-racers"
-@attribute [Authorize(Roles = "Owner,Trainer")]
+@attribute [Microsoft.AspNetCore.Components.Authorization.Authorize(Roles = "Owner,Trainer")]
 @inject ApiClient Api
 
 <h1>My Racers</h1>

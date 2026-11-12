@@ -1,5 +1,5 @@
 @page "/vet-care"
-@attribute [Authorize(Roles = "Vet,TrackAdmin")]
+@attribute [Microsoft.AspNetCore.Components.Authorization.Authorize(Roles = "Vet,TrackAdmin")]
 @inject ApiClient Api
 
 <h1>Veterinary Care</h1>
