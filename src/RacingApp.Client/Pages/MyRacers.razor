@@ -1,0 +1,55 @@
+@page "/my-racers"
+@attribute [Authorize(Roles = "Owner,Trainer")]
+@inject ApiClient Api
+
+<h1>My Racers</h1>
+
+@if (racers is null)
+{
+    <p>Loading...</p>
+}
+else if (racers.Count == 0)
+{
+    <p>No racers are linked to your account yet. The track administrator links your login to your owner or trainer record.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Kennel no.</th><th>Age</th><th>Sex</th><th>Weight (kg)</th><th>Trainer</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var racer in racers)
+            {
+                <tr>
+                    <td>@racer.Name @if (racer.IsRetired)
+                    {
+                        <span class="badge">Retired</span>
+                    }</td>
+                    <td>@racer.KennelNumber</td>
+                    <td>@racer.AgeYears</td>
+                    <td>@racer.Sex</td>
+                    <td>@racer.WeightKg.ToString("0.0")</td>
+                    <td>@racer.TrainerName</td>
+                    <td><a class="btn" href="racers/@racer.Id">View</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<RacerDto>? racers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            racers = await Api.GetMyRacersAsync();
+        }
+        catch (ApiError)
+        {
+            racers = new List<RacerDto>();
+        }
+    }
+}

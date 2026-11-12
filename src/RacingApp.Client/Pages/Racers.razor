@@ -1,0 +1,179 @@
+@page "/racers"
+@attribute [Authorize]
+@inject ApiClient Api
+
+<h1>Racers</h1>
+
+<div class="card">
+    <input placeholder="Search by name or kennel number..." @bind="search" @bind:after="LoadAsync" />
+</div>
+
+<AuthorizeView Roles="Owner,Trainer,TrackAdmin">
+    <div class="card">
+        <h3>Register a racer</h3>
+        @if (createError is not null)
+        {
+            <div class="alert-error">@createError</div>
+        }
+        <EditForm Model="createRequest" OnValidSubmit="CreateRacer">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div>
+                    <label>Name</label>
+                    <InputText @bind-Value="createRequest.Name" />
+                </div>
+                <div>
+                    <label>Kennel number</label>
+                    <InputText @bind-Value="createRequest.KennelNumber" />
+                </div>
+                <div>
+                    <label>Date of birth</label>
+                    <InputDate Type="InputDateType.Date" @bind-Value="createRequest.DateOfBirth" />
+                </div>
+                <div>
+                    <label>Sex</label>
+                    <InputSelect @bind-Value="createRequest.Sex">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </InputSelect>
+                </div>
+                <div>
+                    <label>Breed</label>
+                    <InputText @bind-Value="createRequest.Breed" />
+                </div>
+                <div>
+                    <label>Color</label>
+                    <InputText @bind-Value="createRequest.Color" />
+                </div>
+                <div>
+                    <label>Microchip number</label>
+                    <InputText @bind-Value="createRequest.MicrochipNumber" />
+                </div>
+                <div>
+                    <label>Weight (kg)</label>
+                    <InputNumber @bind-Value="createRequest.WeightKg" />
+                </div>
+                <div>
+                    <label>Stable</label>
+                    <InputSelect @bind-Value="createRequest.StableId">
+                        <option value="">(none)</option>
+                        @foreach (var stable in stables)
+                        {
+                            <option value="@stable.Id">@stable.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div>
+                    <label>Trainer</label>
+                    <InputSelect @bind-Value="createRequest.TrainerId">
+                        <option value="">(none)</option>
+                        @foreach (var trainer in trainers)
+                        {
+                            <option value="@trainer.Id">@trainer.FullName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div>
+                    <label>Primary owner</label>
+                    <InputSelect @bind-Value="createRequest.OwnerId">
+                        <option value="">(none)</option>
+                        @foreach (var owner in owners)
+                        {
+                            <option value="@owner.Id">@owner.FullName</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+            <button type="submit">Register racer</button>
+        </EditForm>
+    </div>
+</AuthorizeView>
+
+@if (racers is null)
+{
+    <p>Loading racers...</p>
+}
+else if (racers.Count == 0)
+{
+    <p>No racers found.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Kennel no.</th>
+                <th>Age</th>
+                <th>Sex</th>
+                <th>Breed</th>
+                <th>Weight (kg)</th>
+                <th>Stable</th>
+                <th>Trainer</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var racer in racers)
+            {
+                <tr>
+                    <td>@racer.Name @if (racer.IsRetired)
+                    {
+                        <span class="badge">Retired</span>
+                    }</td>
+                    <td>@racer.KennelNumber</td>
+                    <td>@racer.AgeYears</td>
+                    <td>@racer.Sex</td>
+                    <td>@racer.Breed</td>
+                    <td>@racer.WeightKg.ToString("0.0")</td>
+                    <td>@racer.StableName</td>
+                    <td>@racer.TrainerName</td>
+                    <td><a class="btn" href="racers/@racer.Id">View</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<RacerDto>? racers;
+    private List<StableDto> stables = new();
+    private List<TrainerDto> trainers = new();
+    private List<OwnerDto> owners = new();
+
+    private string search = string.Empty;
+    private CreateRacerRequest createRequest = new();
+    private string? createError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            racers = await Api.GetRacersAsync(search);
+            stables = await Api.GetStablesAsync();
+            trainers = await Api.GetTrainersAsync();
+            owners = await Api.GetOwnersAsync();
+        }
+        catch (ApiError)
+        {
+            racers = new List<RacerDto>();
+        }
+    }
+
+    private async Task CreateRacer()
+    {
+        createError = null;
+        try
+        {
+            await Api.CreateRacerAsync(createRequest);
+            createRequest = new CreateRacerRequest();
+            racers = await Api.GetRacersAsync(search);
+        }
+        catch (ApiError ex)
+        {
+            createError = ex.Message;
+        }
+    }
+}

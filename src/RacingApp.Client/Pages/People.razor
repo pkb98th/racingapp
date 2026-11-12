@@ -1,0 +1,311 @@
+@page "/people"
+@attribute [Authorize]
+@inject ApiClient Api
+
+<h1>Directory</h1>
+
+<AuthorizeView Roles="TrackAdmin">
+    <div class="card">
+        <h3>Add racetrack</h3>
+        @if (trackError is not null)
+        {
+            <div class="alert-error">@trackError</div>
+        }
+        <EditForm Model="trackRequest" OnValidSubmit="CreateTrack">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div><label>Name</label><InputText @bind-Value="trackRequest.Name" /></div>
+                <div><label>Address</label><InputText @bind-Value="trackRequest.Address" /></div>
+                <div><label>Length (m)</label><InputNumber @bind-Value="trackRequest.TrackLengthMeters" /></div>
+                <div><label>Surface</label><InputText @bind-Value="trackRequest.Surface" /></div>
+                <div><label>Capacity</label><InputNumber @bind-Value="trackRequest.Capacity" /></div>
+            </div>
+            <button type="submit">Add</button>
+        </EditForm>
+    </div>
+    <div class="card">
+        <h3>Add stable</h3>
+        @if (stableError is not null)
+        {
+            <div class="alert-error">@stableError</div>
+        }
+        <EditForm Model="stableRequest" OnValidSubmit="CreateStable">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div><label>Name</label><InputText @bind-Value="stableRequest.Name" /></div>
+                <div><label>Address</label><InputText @bind-Value="stableRequest.Address" /></div>
+                <div><label>Capacity</label><InputNumber @bind-Value="stableRequest.Capacity" /></div>
+            </div>
+            <button type="submit">Add</button>
+        </EditForm>
+    </div>
+    <div class="card">
+        <h3>Add owner</h3>
+        @if (ownerError is not null)
+        {
+            <div class="alert-error">@ownerError</div>
+        }
+        <EditForm Model="ownerRequest" OnValidSubmit="CreateOwner">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div><label>First name</label><InputText @bind-Value="ownerRequest.FirstName" /></div>
+                <div><label>Last name</label><InputText @bind-Value="ownerRequest.LastName" /></div>
+                <div><label>Email</label><InputText @bind-Value="ownerRequest.Email" /></div>
+                <div><label>Phone</label><InputText @bind-Value="ownerRequest.Phone" /></div>
+            </div>
+            <button type="submit">Add</button>
+        </EditForm>
+    </div>
+    <div class="card">
+        <h3>Add trainer</h3>
+        @if (trainerError is not null)
+        {
+            <div class="alert-error">@trainerError</div>
+        }
+        <EditForm Model="trainerRequest" OnValidSubmit="CreateTrainer">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div><label>First name</label><InputText @bind-Value="trainerRequest.FirstName" /></div>
+                <div><label>Last name</label><InputText @bind-Value="trainerRequest.LastName" /></div>
+                <div><label>License no.</label><InputText @bind-Value="trainerRequest.LicenseNumber" /></div>
+                <div><label>Email</label><InputText @bind-Value="trainerRequest.Email" /></div>
+                <div><label>Phone</label><InputText @bind-Value="trainerRequest.Phone" /></div>
+                <div>
+                    <label>Stable</label>
+                    <InputSelect @bind-Value="trainerRequest.StableId">
+                        <option value="">(none)</option>
+                        @foreach (var stable in stables)
+                        {
+                            <option value="@stable.Id">@stable.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+            <button type="submit">Add</button>
+        </EditForm>
+    </div>
+    <div class="card">
+        <h3>Add vet</h3>
+        @if (vetError is not null)
+        {
+            <div class="alert-error">@vetError</div>
+        }
+        <EditForm Model="vetRequest" OnValidSubmit="CreateVet">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div><label>First name</label><InputText @bind-Value="vetRequest.FirstName" /></div>
+                <div><label>Last name</label><InputText @bind-Value="vetRequest.LastName" /></div>
+                <div><label>License no.</label><InputText @bind-Value="vetRequest.LicenseNumber" /></div>
+                <div><label>Clinic</label><InputText @bind-Value="vetRequest.ClinicName" /></div>
+                <div><label>Phone</label><InputText @bind-Value="vetRequest.Phone" /></div>
+            </div>
+            <button type="submit">Add</button>
+        </EditForm>
+    </div>
+</AuthorizeView>
+
+<AuthorizeView Roles="Trainer">
+    <div class="card">
+        <h3>Add handler</h3>
+        @if (handlerError is not null)
+        {
+            <div class="alert-error">@handlerError</div>
+        }
+        <EditForm Model="handlerRequest" OnValidSubmit="CreateHandler">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div><label>First name</label><InputText @bind-Value="handlerRequest.FirstName" /></div>
+                <div><label>Last name</label><InputText @bind-Value="handlerRequest.LastName" /></div>
+                <div><label>Phone</label><InputText @bind-Value="handlerRequest.Phone" /></div>
+                <div>
+                    <label>Trainer</label>
+                    <InputSelect @bind-Value="handlerRequest.TrainerId">
+                        <option value="0">Select trainer...</option>
+                        @foreach (var trainer in trainers)
+                        {
+                            <option value="@trainer.Id">@trainer.FullName</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+            <button type="submit">Add</button>
+        </EditForm>
+    </div>
+</AuthorizeView>
+
+<h2>Racetracks</h2>
+<table>
+    <thead><tr><th>Name</th><th>Address</th><th>Length (m)</th><th>Surface</th><th>Capacity</th></tr></thead>
+    <tbody>
+        @foreach (var track in tracks)
+        {
+            <tr><td>@track.Name</td><td>@track.Address</td><td>@track.TrackLengthMeters</td><td>@track.Surface</td><td>@track.Capacity.ToString("N0")</td></tr>
+        }
+    </tbody>
+</table>
+
+<h2>Stables</h2>
+<table>
+    <thead><tr><th>Name</th><th>Address</th><th>Capacity</th></tr></thead>
+    <tbody>
+        @foreach (var stable in stables)
+        {
+            <tr><td>@stable.Name</td><td>@stable.Address</td><td>@stable.Capacity</td></tr>
+        }
+    </tbody>
+</table>
+
+<h2>Owners</h2>
+<table>
+    <thead><tr><th>Name</th><th>Email</th><th>Phone</th></tr></thead>
+    <tbody>
+        @foreach (var owner in owners)
+        {
+            <tr><td>@owner.FullName</td><td>@owner.Email</td><td>@owner.Phone</td></tr>
+        }
+    </tbody>
+</table>
+
+<h2>Trainers</h2>
+<table>
+    <thead><tr><th>Name</th><th>License no.</th><th>Email</th><th>Phone</th><th>Stable</th></tr></thead>
+    <tbody>
+        @foreach (var trainer in trainers)
+        {
+            <tr><td>@trainer.FullName</td><td>@trainer.LicenseNumber</td><td>@trainer.Email</td><td>@trainer.Phone</td><td>@trainer.StableName</td></tr>
+        }
+    </tbody>
+</table>
+
+<h2>Vets</h2>
+<table>
+    <thead><tr><th>Name</th><th>License no.</th><th>Clinic</th><th>Phone</th></tr></thead>
+    <tbody>
+        @foreach (var vet in vets)
+        {
+            <tr><td>@vet.FullName</td><td>@vet.LicenseNumber</td><td>@vet.ClinicName</td><td>@vet.Phone</td></tr>
+        }
+    </tbody>
+</table>
+
+<h2>Handlers</h2>
+<table>
+    <thead><tr><th>Name</th><th>Phone</th><th>Trainer</th></tr></thead>
+    <tbody>
+        @foreach (var handler in handlers)
+        {
+            <tr><td>@handler.FullName</td><td>@handler.Phone</td><td>@handler.TrainerName</td></tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<RacetrackDto> tracks = new();
+    private List<StableDto> stables = new();
+    private List<OwnerDto> owners = new();
+    private List<TrainerDto> trainers = new();
+    private List<VetDto> vets = new();
+    private List<HandlerDto> handlers = new();
+
+    private CreateRacetrackRequest trackRequest = new();
+    private CreateStableRequest stableRequest = new();
+    private CreateOwnerRequest ownerRequest = new();
+    private CreateTrainerRequest trainerRequest = new();
+    private CreateVetRequest vetRequest = new();
+    private CreateHandlerRequest handlerRequest = new();
+
+    private string? trackError;
+    private string? stableError;
+    private string? ownerError;
+    private string? trainerError;
+    private string? vetError;
+    private string? handlerError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            tracks = await Api.GetRacetracksAsync();
+            stables = await Api.GetStablesAsync();
+            owners = await Api.GetOwnersAsync();
+            trainers = await Api.GetTrainersAsync();
+            vets = await Api.GetVetsAsync();
+            handlers = await Api.GetHandlersAsync();
+        }
+        catch (ApiError)
+        {
+        }
+    }
+
+    private async Task CreateTrack()
+    {
+        trackError = null;
+        try
+        {
+            await Api.CreateRacetrackAsync(trackRequest);
+            trackRequest = new CreateRacetrackRequest();
+            tracks = await Api.GetRacetracksAsync();
+        }
+        catch (ApiError ex) { trackError = ex.Message; }
+    }
+
+    private async Task CreateStable()
+    {
+        stableError = null;
+        try
+        {
+            await Api.CreateStableAsync(stableRequest);
+            stableRequest = new CreateStableRequest();
+            stables = await Api.GetStablesAsync();
+        }
+        catch (ApiError ex) { stableError = ex.Message; }
+    }
+
+    private async Task CreateOwner()
+    {
+        ownerError = null;
+        try
+        {
+            await Api.CreateOwnerAsync(ownerRequest);
+            ownerRequest = new CreateOwnerRequest();
+            owners = await Api.GetOwnersAsync();
+        }
+        catch (ApiError ex) { ownerError = ex.Message; }
+    }
+
+    private async Task CreateTrainer()
+    {
+        trainerError = null;
+        try
+        {
+            await Api.CreateTrainerAsync(trainerRequest);
+            trainerRequest = new CreateTrainerRequest();
+            trainers = await Api.GetTrainersAsync();
+        }
+        catch (ApiError ex) { trainerError = ex.Message; }
+    }
+
+    private async Task CreateVet()
+    {
+        vetError = null;
+        try
+        {
+            await Api.CreateVetAsync(vetRequest);
+            vetRequest = new CreateVetRequest();
+            vets = await Api.GetVetsAsync();
+        }
+        catch (ApiError ex) { vetError = ex.Message; }
+    }
+
+    private async Task CreateHandler()
+    {
+        handlerError = null;
+        try
+        {
+            await Api.CreateHandlerAsync(handlerRequest);
+            handlerRequest = new CreateHandlerRequest();
+            handlers = await Api.GetHandlersAsync();
+        }
+        catch (ApiError ex) { handlerError = ex.Message; }
+    }
+}

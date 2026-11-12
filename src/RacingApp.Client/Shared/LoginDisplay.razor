@@ -1,0 +1,29 @@
+<AuthorizeView>
+    <Authorized>
+        <div class="user-box">
+            <div>@context.User.FindFirst("fullName")?.Value</div>
+            <div class="role">@string.Join(", ", context.User.Claims.Where(c => c.Type == "role").Select(c => c.Value))</div>
+            <button class="secondary" @onclick="Logout">Log out</button>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="user-box">
+            <a href="login" style="color:#fff">Log in</a> &middot;
+            <a href="register" style="color:#fff">Register</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Inject]
+    private AuthService Auth { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
+
+    private async Task Logout()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("login");
+    }
+}

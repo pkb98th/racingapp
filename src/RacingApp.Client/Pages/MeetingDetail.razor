@@ -1,0 +1,306 @@
+@page "/meetings/{Id:int}"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (meeting is null)
+{
+    <p>Loading meeting...</p>
+}
+else
+{
+    <h1>@meeting.RacetrackName &mdash; @meeting.Date.ToString("ddd dd MMM yyyy")</h1>
+    <p>
+        Gates open @(meeting.GatesOpen?.ToString("HH:mm") ?? "-")
+        <span class="badge">@meeting.Status</span>
+    </p>
+
+    <AuthorizeView Roles="TrackAdmin">
+        <div class="card">
+            <h3>Add race</h3>
+            @if (raceError is not null)
+            {
+                <div class="alert-error">@raceError</div>
+            }
+            <EditForm Model="raceRequest" OnValidSubmit="CreateRace">
+                <DataAnnotationsValidator />
+                <div class="form-grid">
+                    <div>
+                        <label>Race number</label>
+                        <InputNumber @bind-Value="raceRequest.RaceNumber" />
+                    </div>
+                    <div>
+                        <label>Distance (m)</label>
+                        <InputNumber @bind-Value="raceRequest.DistanceMeters" />
+                    </div>
+                    <div>
+                        <label>Grade</label>
+                        <InputText @bind-Value="raceRequest.Grade" />
+                    </div>
+                    <div>
+                        <label>Prize money</label>
+                        <InputNumber @bind-Value="raceRequest.PrizeMoney" />
+                    </div>
+                    <div>
+                        <label>Scheduled time</label>
+                        <InputTime @bind-Value="raceRequest.ScheduledTime" />
+                    </div>
+                </div>
+                <button type="submit">Add race</button>
+            </EditForm>
+        </div>
+    </AuthorizeView>
+
+    @if (!meeting.Races.Any())
+    {
+        <p>No races have been scheduled for this meeting yet.</p>
+    }
+
+    @foreach (var race in meeting.Races)
+    {
+        <div class="card">
+            <h3>
+                Race @race.RaceNumber &mdash; @race.DistanceMeters m
+                @if (!string.IsNullOrEmpty(race.Grade))
+                {
+                    <span class="badge">@race.Grade</span>
+                }
+                <span class="badge">@(race.ScheduledTime.ToString("HH:mm"))</span>
+                <span class="badge @(race.Status == RaceStatus.Resulted ? "ok" : "")">@race.Status</span>
+            </h3>
+            <p>Prize: @race.PrizeMoney.ToString("N0")</p>
+
+            @if (race.Entries.Any())
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Trap</th>
+                            <th>Racer</th>
+                            <th>Trainer</th>
+                            <th>Handler</th>
+                            <th>Weight (kg)</th>
+                            <th>Status</th>
+                            <th>Finish</th>
+                            <th>Time (s)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in race.Entries)
+                        {
+                            <tr>
+                                <td>@entry.TrapNumber</td>
+                                <td><a href="racers/@entry.RacerId">@entry.RacerName</a></td>
+                                <td>@entry.TrainerName</td>
+                                <td>@entry.HandlerName</td>
+                                <td>@entry.WeightKg?.ToString("0.0")</td>
+                                <td><span class="badge">@entry.Status</span></td>
+                                <td>@(entry.FinishPosition?.ToString() ?? "-")</td>
+                                <td>@(entry.RaceTimeSeconds?.ToString("0.00") ?? "-")</td>
+                                <td>
+                                    <AuthorizeView Roles="TrackAdmin">
+                                        <button class="secondary" @onclick="() => BeginResult(entry)">Result</button>
+                                        <button class="secondary" @onclick="() => Scratch(entry)">Scratch</button>
+                                    </AuthorizeView>
+                                </td>
+                            </tr>
+                            @if (resultEntryId == entry.Id)
+                            {
+                                <tr>
+                                    <td colspan="9">
+                                        <EditForm Model="resultRequest" OnValidSubmit="SaveResult">
+                                            <DataAnnotationsValidator />
+                                            <div class="form-grid">
+                                                <div>
+                                                    <label>Finish position</label>
+                                                    <InputNumber @bind-Value="resultRequest.FinishPosition" />
+                                                </div>
+                                                <div>
+                                                    <label>Race time (seconds)</label>
+                                                    <InputNumber @bind-Value="resultRequest.RaceTimeSeconds" />
+                                                </div>
+                                            </div>
+                                            <button type="submit">Save result</button>
+                                            <button type="button" class="secondary" @onclick="() => resultEntryId = null">Cancel</button>
+                                        </EditForm>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p>No entries yet.</p>
+            }
+
+            <AuthorizeView Roles="TrackAdmin">
+                @if (!raceIdsWithForm.Contains(race.Id))
+                {
+                    <button class="secondary" @onclick="() => ShowEntryForm(race.Id)">Add entry</button>
+                }
+                else
+                {
+                    @if (entryError is not null)
+                    {
+                        <div class="alert-error">@entryError</div>
+                    }
+                    <EditForm Model="entryRequest" OnValidSubmit="CreateEntry">
+                        <DataAnnotationsValidator />
+                        <div class="form-grid">
+                            <div>
+                                <label>Racer</label>
+                                <InputSelect @bind-Value="entryRequest.RacerId">
+                                    <option value="0">Select racer...</option>
+                                    @foreach (var racer in racers)
+                                    {
+                                        <option value="@racer.Id">@racer.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div>
+                                <label>Trainer</label>
+                                <InputSelect @bind-Value="entryRequest.TrainerId">
+                                    <option value="">(none)</option>
+                                    @foreach (var trainer in trainers)
+                                    {
+                                        <option value="@trainer.Id">@trainer.FullName</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div>
+                                <label>Handler</label>
+                                <InputSelect @bind-Value="entryRequest.HandlerId">
+                                    <option value="">(none)</option>
+                                    @foreach (var handler in handlers)
+                                    {
+                                        <option value="@handler.Id">@handler.FullName</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div>
+                                <label>Trap number</label>
+                                <InputNumber @bind-Value="entryRequest.TrapNumber" />
+                            </div>
+                            <div>
+                                <label>Weight (kg)</label>
+                                <InputNumber @bind-Value="entryRequest.WeightKg" />
+                            </div>
+                        </div>
+                        <button type="submit">Save entry</button>
+                        <button type="button" class="secondary" @onclick="() => raceIdsWithForm.Remove(race.Id)">Cancel</button>
+                    </EditForm>
+                }
+            </AuthorizeView>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private RaceMeetingDto? meeting;
+    private List<RacerDto> racers = new();
+    private List<TrainerDto> trainers = new();
+    private List<HandlerDto> handlers = new();
+
+    private CreateRaceRequest raceRequest = new();
+    private string? raceError;
+
+    private CreateEntryRequest entryRequest = new();
+    private string? entryError;
+    private List<int> raceIdsWithForm = new();
+
+    private int resultEntryId;
+    private SetResultRequest resultRequest = new();
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        meeting = await Api.GetMeetingAsync(Id);
+        if (meeting is null)
+        {
+            Nav.NavigateTo("");
+            return;
+        }
+
+        racers = await Api.GetRacersAsync();
+        trainers = await Api.GetTrainersAsync();
+        handlers = await Api.GetHandlersAsync();
+    }
+
+    private async Task CreateRace()
+    {
+        raceError = null;
+        raceRequest.RaceMeetingId = Id;
+        try
+        {
+            await Api.CreateRaceAsync(raceRequest);
+            raceRequest = new CreateRaceRequest();
+            meeting = await Api.GetMeetingAsync(Id);
+        }
+        catch (ApiError ex)
+        {
+            raceError = ex.Message;
+        }
+    }
+
+    private void ShowEntryForm(int raceId)
+    {
+        entryRequest = new CreateEntryRequest { RaceId = raceId };
+        entryError = null;
+        raceIdsWithForm.Add(raceId);
+    }
+
+    private async Task CreateEntry()
+    {
+        entryError = null;
+        try
+        {
+            await Api.CreateEntryAsync(entryRequest);
+            raceIdsWithForm.Remove(entryRequest.RaceId);
+            meeting = await Api.GetMeetingAsync(Id);
+        }
+        catch (ApiError ex)
+        {
+            entryError = ex.Message;
+        }
+    }
+
+    private void BeginResult(EntryDto entry)
+    {
+        resultEntryId = entry.Id;
+        resultRequest = new SetResultRequest();
+    }
+
+    private async Task SaveResult()
+    {
+        try
+        {
+            await Api.SetResultAsync(resultEntryId, resultRequest);
+            resultEntryId = 0;
+            meeting = await Api.GetMeetingAsync(Id);
+        }
+        catch (ApiError ex)
+        {
+            entryError = ex.Message;
+        }
+    }
+
+    private async Task Scratch(EntryDto entry)
+    {
+        try
+        {
+            await Api.ScratchEntryAsync(entry.Id);
+            meeting = await Api.GetMeetingAsync(Id);
+        }
+        catch (ApiError ex)
+        {
+            entryError = ex.Message;
+        }
+    }
+}

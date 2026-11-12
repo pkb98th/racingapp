@@ -1,0 +1,156 @@
+@page "/vet-care"
+@attribute [Authorize(Roles = "Vet,TrackAdmin")]
+@inject ApiClient Api
+
+<h1>Veterinary Care</h1>
+
+<AuthorizeView Roles="Vet">
+    <div class="card">
+        <h3>Record treatment</h3>
+        @if (treatmentError is not null)
+        {
+            <div class="alert-error">@treatmentError</div>
+        }
+        @if (treatmentError is null && successMessage is not null)
+        {
+            <div class="alert-success">@successMessage</div>
+        }
+        <EditForm Model="treatmentRequest" OnValidSubmit="CreateTreatment">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div>
+                    <label>Injury</label>
+                    <InputSelect @bind-Value="treatmentRequest.InjuryId">
+                        <option value="0">Select injury...</option>
+                        @foreach (var injury in (injuries ?? new List<InjuryDto>()).Where(i => i.Status != InjuryStatus.Cleared))
+                        {
+                            <option value="@injury.Id">@injury.RacerName &mdash; @injury.Description (@injury.DateReported.ToString("dd MMM"))</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div>
+                    <label>Date administered</label>
+                    <InputDate Type="InputDateType.Date" @bind-Value="treatmentRequest.DateAdministered" />
+                </div>
+                <div>
+                    <label>Description</label>
+                    <InputText @bind-Value="treatmentRequest.Description" />
+                </div>
+                <div>
+                    <label>Medication</label>
+                    <InputText @bind-Value="treatmentRequest.Medication" />
+                </div>
+                <div>
+                    <label>Dosage</label>
+                    <InputText @bind-Value="treatmentRequest.Dosage" />
+                </div>
+                <div>
+                    <label>Withdrawal period (days)</label>
+                    <InputNumber @bind-Value="treatmentRequest.WithdrawalPeriodDays" />
+                </div>
+                <div>
+                    <label>Follow-up date</label>
+                    <InputDate Type="InputDateType.Date" @bind-Value="treatmentRequest.FollowUpDate" />
+                </div>
+            </div>
+            <button type="submit">Save treatment</button>
+        </EditForm>
+    </div>
+</AuthorizeView>
+
+@if (injuries is null)
+{
+    <p>Loading injuries...</p>
+}
+else if (injuries.Count == 0)
+{
+    <p>No injuries on record.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Reported</th>
+                <th>Racer</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Description</th>
+                <th>Vet</th>
+                <th>Treatments</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var injury in injuries)
+            {
+                <tr>
+                    <td>@injury.DateReported.ToString("dd MMM yyyy")</td>
+                    <td><a href="racers/@injury.RacerId">@injury.RacerName</a></td>
+                    <td><span class="badge @(injury.Severity == InjurySeverity.Severe ? "bad" : injury.Severity == InjurySeverity.Moderate ? "warn" : "ok")">@injury.Severity</span></td>
+                    <td>@injury.Status</td>
+                    <td>@injury.Description</td>
+                    <td>@injury.VetName</td>
+                    <td>@injury.Treatments.Count</td>
+                    <td>
+                        <AuthorizeView Roles="Vet">
+                            @if (injury.Status != InjuryStatus.Cleared)
+                            {
+                                <button class="secondary" @onclick="() => MarkCleared(injury)">Mark cleared</button>
+                            }
+                        </AuthorizeView>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<InjuryDto>? injuries;
+    private CreateTreatmentRequest treatmentRequest = new();
+    private string? treatmentError;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            injuries = await Api.GetInjuriesAsync();
+        }
+        catch (ApiError)
+        {
+            injuries = new List<InjuryDto>();
+        }
+    }
+
+    private async Task CreateTreatment()
+    {
+        treatmentError = null;
+        successMessage = null;
+        try
+        {
+            await Api.CreateTreatmentAsync(treatmentRequest);
+            treatmentRequest = new CreateTreatmentRequest();
+            injuries = await Api.GetInjuriesAsync();
+            successMessage = "Treatment recorded.";
+        }
+        catch (ApiError ex)
+        {
+            treatmentError = ex.Message;
+        }
+    }
+
+    private async Task MarkCleared(InjuryDto injury)
+    {
+        try
+        {
+            await Api.SetInjuryStatusAsync(injury.Id, InjuryStatus.Cleared);
+            injuries = await Api.GetInjuriesAsync();
+        }
+        catch (ApiError ex)
+        {
+            treatmentError = ex.Message;
+        }
+    }
+}

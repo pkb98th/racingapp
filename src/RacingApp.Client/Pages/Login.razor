@@ -1,0 +1,51 @@
+@page "/login"
+
+<h1>Log in</h1>
+
+<div class="card" style="max-width:420px">
+    @if (error is not null)
+    {
+        <div class="alert-error">@error</div>
+    }
+    <EditForm Model="model" OnValidSubmit="Submit">
+        <DataAnnotationsValidator />
+        <label>Email</label>
+        <InputText @bind-Value="model.Email" />
+        <label>Password</label>
+        <InputText type="password" @bind-Value="model.Password" />
+        <button type="submit" disabled="@busy">Log in</button>
+    </EditForm>
+    <p>New racegoer? <a href="register">Create an account</a></p>
+</div>
+
+@code {
+    private LoginRequest model = new();
+    private string? error;
+    private bool busy;
+
+    [Inject]
+    private AuthService Auth { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
+
+    private async Task Submit()
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            var result = await Auth.LoginAsync(model);
+            if (result is null)
+            {
+                error = "Invalid email or password.";
+                return;
+            }
+            Nav.NavigateTo("");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

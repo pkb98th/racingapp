@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+
+<div class="layout">
+    <div class="sidebar">
+        <div class="brand">Racing<span>App</span></div>
+        <nav>
+            <NavLink href="" Match="NavLinkMatch.All">Schedule</NavLink>
+            <NavLink href="racers">Racers</NavLink>
+            <AuthorizeView Roles="Owner,Trainer">
+                <NavLink href="my-racers">My Racers</NavLink>
+            </AuthorizeView>
+            <AuthorizeView Roles="Vet,TrackAdmin">
+                <NavLink href="vet-care">Vet Care</NavLink>
+            </AuthorizeView>
+            <NavLink href="people">Directory</NavLink>
+        </nav>
+        <LoginDisplay />
+    </div>
+    <div class="main">
+        @Body
+    </div>
+</div>

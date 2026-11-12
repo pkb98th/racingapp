@@ -1,0 +1,110 @@
+@page "/"
+@attribute [Authorize]
+@inject ApiClient Api
+
+<h1>Race Schedule</h1>
+
+<AuthorizeView Roles="TrackAdmin">
+    <div class="card">
+        <h3>New race meeting</h3>
+        @if (meetingError is not null)
+        {
+            <div class="alert-error">@meetingError</div>
+        }
+        <EditForm Model="meetingRequest" OnValidSubmit="CreateMeeting">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div>
+                    <label>Racetrack</label>
+                    <InputSelect @bind-Value="meetingRequest.RacetrackId">
+                        <option value="0">Select track...</option>
+                        @foreach (var track in tracks)
+                        {
+                            <option value="@track.Id">@track.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div>
+                    <label>Date</label>
+                    <InputDate Type="InputDateType.Date" @bind-Value="meetingRequest.Date" />
+                </div>
+                <div>
+                    <label>Gates open</label>
+                    <InputTime @bind-Value="meetingRequest.GatesOpen" />
+                </div>
+            </div>
+            <button type="submit">Create meeting</button>
+        </EditForm>
+    </div>
+</AuthorizeView>
+
+@if (meetings is null)
+{
+    <p>Loading schedule...</p>
+}
+else if (meetings.Count == 0)
+{
+    <p>No race meetings scheduled yet.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Racetrack</th>
+                <th>Gates open</th>
+                <th>Races</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var meeting in meetings)
+            {
+                <tr>
+                    <td>@meeting.Date.ToString("ddd dd MMM yyyy")</td>
+                    <td>@meeting.RacetrackName</td>
+                    <td>@(meeting.GatesOpen?.ToString("HH:mm") ?? "-")</td>
+                    <td>@meeting.Races.Count</td>
+                    <td><span class="badge">@meeting.Status</span></td>
+                    <td><a class="btn" href="meetings/@meeting.Id">View</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<RaceMeetingDto>? meetings;
+    private List<RacetrackDto> tracks = new();
+    private CreateMeetingRequest meetingRequest = new();
+    private string? meetingError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            meetings = await Api.GetMeetingsAsync();
+            tracks = await Api.GetRacetracksAsync();
+        }
+        catch (ApiError)
+        {
+            meetings = new List<RaceMeetingDto>();
+        }
+    }
+
+    private async Task CreateMeeting()
+    {
+        meetingError = null;
+        try
+        {
+            await Api.CreateMeetingAsync(meetingRequest);
+            meetings = await Api.GetMeetingsAsync();
+        }
+        catch (ApiError ex)
+        {
+            meetingError = ex.Message;
+        }
+    }
+}
