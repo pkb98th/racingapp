@@ -42,7 +42,7 @@ else
                     </div>
                     <div>
                         <label>Scheduled time</label>
-                        <InputText type="time" @bind-Value="raceRequest.ScheduledTime" />
+                        <InputDate Type="InputDateType.Time" @bind-Value="raceRequest.ScheduledTime" />
                     </div>
                 </div>
                 <button type="submit">Add race</button>
@@ -213,7 +213,7 @@ else
     private string? entryError;
     private List<int> raceIdsWithForm = new();
 
-    private int resultEntryId;
+    private int? resultEntryId;
     private SetResultRequest resultRequest = new();
 
     [Inject]
@@ -281,7 +281,7 @@ else
     {
         try
         {
-            await Api.SetResultAsync(resultEntryId, resultRequest);
+            await Api.SetResultAsync(resultEntryId.Value, resultRequest);
             resultEntryId = 0;
             meeting = await Api.GetMeetingAsync(Id);
         }
