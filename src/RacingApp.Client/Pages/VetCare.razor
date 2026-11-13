@@ -4,7 +4,7 @@
 
 <h1>Veterinary Care</h1>
 
-<AuthorizeView Roles="Vet">
+<AuthorizeView Context="auth" Roles="Vet">
     <div class="card">
         <h3>Record treatment</h3>
         @if (treatmentError is not null)
@@ -93,7 +93,7 @@ else
                     <td>@injury.VetName</td>
                     <td>@injury.Treatments.Count</td>
                     <td>
-                        <AuthorizeView Roles="Vet">
+                        <AuthorizeView Context="auth" Roles="Vet">
                             @if (injury.Status != InjuryStatus.Cleared)
                             {
                                 <button class="secondary" @onclick="() => MarkCleared(injury)">Mark cleared</button>

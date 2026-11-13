@@ -14,7 +14,7 @@ else
         <span class="badge">@meeting.Status</span>
     </p>
 
-    <AuthorizeView Roles="TrackAdmin">
+    <AuthorizeView Context="auth" Roles="TrackAdmin">
         <div class="card">
             <h3>Add race</h3>
             @if (raceError is not null)
@@ -42,7 +42,7 @@ else
                     </div>
                     <div>
                         <label>Scheduled time</label>
-                        <InputTime @bind-Value="raceRequest.ScheduledTime" />
+                        <InputDate Type="InputDateType.Time" @bind-Value="raceRequest.ScheduledTime" />
                     </div>
                 </div>
                 <button type="submit">Add race</button>
@@ -98,7 +98,7 @@ else
                                 <td>@(entry.FinishPosition?.ToString() ?? "-")</td>
                                 <td>@(entry.RaceTimeSeconds?.ToString("0.00") ?? "-")</td>
                                 <td>
-                                    <AuthorizeView Roles="TrackAdmin">
+                                    <AuthorizeView Context="auth" Roles="TrackAdmin">
                                         <button class="secondary" @onclick="() => BeginResult(entry)">Result</button>
                                         <button class="secondary" @onclick="() => Scratch(entry)">Scratch</button>
                                     </AuthorizeView>
@@ -135,7 +135,7 @@ else
                 <p>No entries yet.</p>
             }
 
-            <AuthorizeView Roles="TrackAdmin">
+            <AuthorizeView Context="auth" Roles="TrackAdmin">
                 @if (!raceIdsWithForm.Contains(race.Id))
                 {
                     <button class="secondary" @onclick="() => ShowEntryForm(race.Id)">Add entry</button>
@@ -213,7 +213,7 @@ else
     private string? entryError;
     private List<int> raceIdsWithForm = new();
 
-    private int resultEntryId;
+    private int? resultEntryId;
     private SetResultRequest resultRequest = new();
 
     [Inject]
@@ -281,7 +281,7 @@ else
     {
         try
         {
-            await Api.SetResultAsync(resultEntryId, resultRequest);
+            await Api.SetResultAsync(resultEntryId.Value, resultRequest);
             resultEntryId = 0;
             meeting = await Api.GetMeetingAsync(Id);
         }

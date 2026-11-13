@@ -1,8 +1,8 @@
-<AuthorizeView>
+<AuthorizeView Context="auth">
     <Authorized>
         <div class="user-box">
-            <div>@context.User.FindFirst("fullName")?.Value</div>
-            <div class="role">@string.Join(", ", context.User.Claims.Where(c => c.Type == "role").Select(c => c.Value))</div>
+            <div>@auth.User.FindFirst("fullName")?.Value</div>
+            <div class="role">@string.Join(", ", auth.User.Claims.Where(c => c.Type == "role").Select(c => c.Value))</div>
             <button class="secondary" @onclick="Logout">Log out</button>
         </div>
     </Authorized>
