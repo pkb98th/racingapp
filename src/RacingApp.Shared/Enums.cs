@@ -1,48 +1,13 @@
 namespace RacingApp.Shared;
 
-public enum RacerSex
-{
-    Male,
-    Female
-}
+public enum RacerSex { Dog, Bitch }
 
-public enum MeetingStatus
-{
-    Scheduled,
-    Open,
-    InProgress,
-    Completed,
-    Cancelled
-}
+public enum MeetingStatus { Scheduled, WeighIn, InProgress, Completed, Cancelled }
 
-public enum RaceStatus
-{
-    Scheduled,
-    WeighIn,
-    InProgress,
-    Resulted,
-    Void
-}
+public enum RaceStatus { Scheduled, InProgress, ResultedIn, Void }
 
-public enum EntryStatus
-{
-    Entered,
-    Scratched,
-    Withdrawn,
-    Resulted
-}
+public enum EntryStatus { Entered, Scratched, Ran, Withdrawn }
 
-public enum InjurySeverity
-{
-    Minor,
-    Moderate,
-    Severe
-}
+public enum InjurySeverity { Minor, Moderate, Severe }
 
-public enum InjuryStatus
-{
-    UnderObservation,
-    InTreatment,
-    Recovering,
-    Cleared
-}
+public enum InjuryStatus { UnderObservation, InTreatment, Cleared }

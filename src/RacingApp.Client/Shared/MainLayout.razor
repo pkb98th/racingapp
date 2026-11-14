@@ -5,14 +5,21 @@
         <div class="brand">Racing<span>App</span></div>
         <nav>
             <NavLink href="" Match="NavLinkMatch.All">Schedule</NavLink>
-            <NavLink href="racers">Racers</NavLink>
-            <AuthorizeView Context="auth" Roles="Owner,Trainer">
+            <AuthorizeView Context="auth" Roles="TrackAdmin,StableAdmin,Owner,Trainer,Handler,Vet">
+                <NavLink href="racers">Racers</NavLink>
+            </AuthorizeView>
+            <AuthorizeView Context="auth" Roles="Owner,Trainer,Handler">
                 <NavLink href="my-racers">My Racers</NavLink>
+            </AuthorizeView>
+            <AuthorizeView Context="auth" Roles="StableAdmin">
+                <NavLink href="my-stable">My Stable</NavLink>
             </AuthorizeView>
             <AuthorizeView Context="auth" Roles="Vet,TrackAdmin">
                 <NavLink href="vet-care">Vet Care</NavLink>
             </AuthorizeView>
-            <NavLink href="people">Directory</NavLink>
+            <AuthorizeView Context="auth" Roles="TrackAdmin">
+                <NavLink href="accounts">Accounts</NavLink>
+            </AuthorizeView>
         </nav>
         <LoginDisplay />
     </div>

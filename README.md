@@ -14,37 +14,49 @@ src/
   RacingApp.Client/      Blazor WASM SPA: login, role-based views, data entry forms
 ```
 
-## Stakeholders and permissions
+## Identity model
+
+- **User** (ASP.NET Core Identity: email + hashed password, JWT login) is linked 1:1 to a **Person** (names, contact details, license, stable membership) via `Person.AppUserId`.
+- A user holds **one or many roles**; a person can therefore be an owner, trainer, handler, vet, racegoer — or several at once.
+- Public self-registration always creates a **Racegoer**. All other accounts are provisioned by an administrator through the Accounts page (`/api/users`).
+
+## Roles and permissions
 
 | Role | Views | Data entry |
 |---|---|---|
-| **TrackAdmin** | Everything | Racetracks, stables, meetings, races, entries, results; provisions owner/trainer/vet records |
-| **Owner** | Schedule, results, own racers (with injury history) | Register racers, report injuries |
-| **Trainer** | Schedule, own racers | Register racers, add handlers, add/scratch entries, report injuries |
-| **Vet** | All injuries/treatments, racer profiles | Record injuries, treatments (with medication + withdrawal periods), clear injuries |
+| **TrackAdmin** | Everything | Racetracks, stables, meetings, races, entries (only racers flagged available), results; provisions all accounts and roles |
+| **StableAdmin** | Own stable: racers, staff, availability | Adds racers to the stable; adds trainer/handler accounts; flags racers available per track |
+| **Owner** | Schedule, results, own racers (via ownership) | None (read-only) |
+| **Trainer** | Schedule, stable racers | Report injuries |
+| **Handler** | Schedule, stable racers | None (read-only) |
+| **Vet** | All injuries/treatments, racer profiles | Record injuries, treatments (medication, dosage, withdrawal period), clear injuries |
 | **Racegoer** | Schedule, races, entries, results, racer profiles | None (read-only) |
-
-Public self-registration creates a **Racegoer** account only. Owner/Trainer/Vet/TrackAdmin logins are provisioned by the track and linked to their person record via `AppUserId` (this powers the "My Racers" view).
 
 ## Domain model
 
-- **Racetrack** → hosts **RaceMeetings** (the schedule) → each meeting has **Races**
-- **RaceEntry** links a **Racer** to a Race with trap number, weight, handler, and (once run) finish position and time
-- **Racer** (the dog) belongs to a **Stable** (kennel), is trained by a **Trainer**, and can have multiple owners via **RacerOwnership** shares
-- **Vet** records **Injuries** against a racer and **Treatments** against an injury (medication, dosage, withdrawal period, follow-up)
-- **Handler** works for a Trainer and can be assigned to an entry
+- **User** 1:1 **Person**; roles live on the user (multi-role supported)
+- **Stable** kennels **Racers**; a racer can switch stables
+- **RacerOwnership** links **Persons with the Owner role** to racers with a share percentage; replacing the ownerships transfers the racer to new owners
+- **RacerAvailability** is a per-(racer, racetrack) flag set by the stable; **TrackAdmin can only enter racers flagged available for the meeting's track** (enforced server-side)
+- **Racetrack** hosts **RaceMeetings** (the schedule) → each meeting has **Races** → **RaceEntry** links a racer with trap number, weight, and (once run) finish position and time
+- **Injuries** (reported by vet/trainer/stable admin) and **Treatments** (vet only, with medication, dosage, withdrawal period, follow-up) hang off racers
 
 ## Seeded demo accounts (password `Passw0rd!`)
 
 | Email | Role |
 |---|---|
 | admin@racing.app | TrackAdmin |
+| stable@racing.app | StableAdmin (Windrush Kennels) |
+| stable2@racing.app | StableAdmin (Seaview Kennels) |
 | owner@racing.app | Owner (Olive Owner) |
-| trainer@racing.app | Trainer (Tara Trainer) |
+| trainer@racing.app | Trainer (Tara Trainer, Windrush) |
+| handler@racing.app | Handler (Hank Handler, Windrush) |
 | vet@racing.app | Vet (Vince Vet) |
 | fan@racing.app | Racegoer |
 
-Seed data includes two tracks, two stables, owners, trainers, handlers, three racers, a meeting with two races and entries, and one injury with a treatment.
+Seed data includes two tracks, two stables, three racers (with ownerships and availability flags), a meeting with two races and entries, and one injury with a treatment.
+
+> **Schema changed?** If you previously ran an older build, delete `src/RacingApp.Api/racingapp.db` before starting — the API recreates and reseeds it.
 
 ## Running locally
 

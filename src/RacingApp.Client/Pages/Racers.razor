@@ -4,13 +4,9 @@
 
 <h1>Racers</h1>
 
-<div class="card">
-    <input placeholder="Search by name or kennel number..." @bind="search" @bind:after="LoadAsync" />
-</div>
-
-<AuthorizeView Context="auth" Roles="Owner,Trainer,TrackAdmin">
+<AuthorizeView Context="auth" Roles="StableAdmin,TrackAdmin">
     <div class="card">
-        <h3>Register a racer</h3>
+        <h3>Add racer</h3>
         @if (createError is not null)
         {
             <div class="alert-error">@createError</div>
@@ -33,8 +29,8 @@
                 <div>
                     <label>Sex</label>
                     <InputSelect @bind-Value="createRequest.Sex">
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
+                        <option value="@RacerSex.Dog">Dog</option>
+                        <option value="@RacerSex.Bitch">Bitch</option>
                     </InputSelect>
                 </div>
                 <div>
@@ -53,41 +49,29 @@
                     <label>Weight (kg)</label>
                     <InputNumber @bind-Value="createRequest.WeightKg" />
                 </div>
-                <div>
-                    <label>Stable</label>
-                    <InputSelect @bind-Value="createRequest.StableId">
-                        <option value="">(none)</option>
-                        @foreach (var stable in stables)
-                        {
-                            <option value="@stable.Id">@stable.Name</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div>
-                    <label>Trainer</label>
-                    <InputSelect @bind-Value="createRequest.TrainerId">
-                        <option value="">(none)</option>
-                        @foreach (var trainer in trainers)
-                        {
-                            <option value="@trainer.Id">@trainer.FullName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div>
-                    <label>Primary owner</label>
-                    <InputSelect @bind-Value="createRequest.OwnerId">
-                        <option value="">(none)</option>
-                        @foreach (var owner in owners)
-                        {
-                            <option value="@owner.Id">@owner.FullName</option>
-                        }
-                    </InputSelect>
-                </div>
+                @if (isTrackAdmin)
+                {
+                    <div>
+                        <label>Stable</label>
+                        <InputSelect @bind-Value="createRequest.StableId">
+                            <option value="">Select stable...</option>
+                            @foreach (var stable in stables)
+                            {
+                                <option value="@stable.Id">@stable.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
             </div>
-            <button type="submit">Register racer</button>
+            <button type="submit">Add racer</button>
         </EditForm>
     </div>
 </AuthorizeView>
+
+<div>
+    <label>Search</label>
+    <InputText @bind-Value="search" @bind-Value:after="LoadAsync" placeholder="Search by name or kennel number..." />
+</div>
 
 @if (racers is null)
 {
@@ -101,17 +85,7 @@ else
 {
     <table>
         <thead>
-            <tr>
-                <th>Name</th>
-                <th>Kennel no.</th>
-                <th>Age</th>
-                <th>Sex</th>
-                <th>Breed</th>
-                <th>Weight (kg)</th>
-                <th>Stable</th>
-                <th>Trainer</th>
-                <th></th>
-            </tr>
+            <tr><th>Name</th><th>Kennel no.</th><th>Age</th><th>Sex</th><th>Weight (kg)</th><th>Stable</th><th>Trainer</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var racer in racers)
@@ -124,7 +98,6 @@ else
                     <td>@racer.KennelNumber</td>
                     <td>@racer.AgeYears</td>
                     <td>@racer.Sex</td>
-                    <td>@racer.Breed</td>
                     <td>@racer.WeightKg.ToString("0.0")</td>
                     <td>@racer.StableName</td>
                     <td>@racer.TrainerName</td>
@@ -138,23 +111,30 @@ else
 @code {
     private List<RacerDto>? racers;
     private List<StableDto> stables = new();
-    private List<TrainerDto> trainers = new();
-    private List<OwnerDto> owners = new();
-
     private string search = string.Empty;
+    private bool isTrackAdmin;
     private CreateRacerRequest createRequest = new();
     private string? createError;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    [Inject]
+    private AuthenticationStateProvider AuthState { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState.GetAuthenticationStateAsync();
+        isTrackAdmin = authState.User.IsInRole(AppRoles.TrackAdmin);
+
+        if (isTrackAdmin)
+            stables = await Api.GetStablesAsync();
+
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
         try
         {
             racers = await Api.GetRacersAsync(search);
-            stables = await Api.GetStablesAsync();
-            trainers = await Api.GetTrainersAsync();
-            owners = await Api.GetOwnersAsync();
         }
         catch (ApiError)
         {
@@ -169,7 +149,7 @@ else
         {
             await Api.CreateRacerAsync(createRequest);
             createRequest = new CreateRacerRequest();
-            racers = await Api.GetRacersAsync(search);
+            await LoadAsync();
         }
         catch (ApiError ex)
         {

@@ -1,5 +1,5 @@
 @page "/my-racers"
-@attribute [Authorize(Roles = "Owner,Trainer")]
+@attribute [Authorize(Roles = "Owner,Trainer,Handler")]
 @inject ApiClient Api
 
 <h1>My Racers</h1>
@@ -10,7 +10,7 @@
 }
 else if (racers.Count == 0)
 {
-    <p>No racers are linked to your account yet. The track administrator links your login to your owner or trainer record.</p>
+    <p>No racers are linked to your account yet. Owners are linked when a racer's ownership is recorded; stable staff see all racers kenneled at their stable.</p>
 }
 else
 {

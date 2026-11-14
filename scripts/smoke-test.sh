@@ -30,33 +30,36 @@ check "GET /swagger" 200 "$code"
 
 echo "== 2. Login all seeded roles =="
 ADMIN=$(login_token admin@racing.app)
+STABLE=$(login_token stable@racing.app)
 OWNER=$(login_token owner@racing.app)
 TRAINER=$(login_token trainer@racing.app)
 VET=$(login_token vet@racing.app)
 FAN=$(login_token fan@racing.app)
-for role in ADMIN OWNER TRAINER VET FAN; do
+for role in ADMIN STABLE OWNER TRAINER VET FAN; do
   [ -n "${!role}" ] && check "login $role" ok ok || check "login $role" ok missing
 done
 
-echo "== 3. Public/list endpoints =="
-code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/racetracks")
-check "GET /api/racetracks (anon)" 200 "$code"
-code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/meetings")
-check "GET /api/meetings (anon)" 200 "$code"
-code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/racers?search=B")
-check "GET /api/racers?search (anon)" 200 "$code"
-
-echo "== 4. Role-restricted endpoints =="
-code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $FAN" "$BASE/api/injuries")
-check "GET /api/injuries as Racegoer (expect 403)" 403 "$code"
-code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $VET" "$BASE/api/injuries")
-check "GET /api/injuries as Vet" 200 "$code"
+echo "== 3. List endpoints =="
+code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $FAN" "$BASE/api/racetracks")
+check "GET /api/racetracks as Racegoer" 200 "$code"
+code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $STABLE" "$BASE/api/stables/mine")
+check "GET /api/stables/mine as StableAdmin" 200 "$code"
 code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $OWNER" "$BASE/api/racers/mine")
 check "GET /api/racers/mine as Owner" 200 "$code"
 code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TRAINER" "$BASE/api/racers/mine")
 check "GET /api/racers/mine as Trainer" 200 "$code"
 
-echo "== 5. TrackAdmin creates meeting + race + entry + result =="
+echo "== 4. Role restrictions =="
+code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $FAN" "$BASE/api/injuries")
+check "GET /api/injuries as Racegoer (expect 403)" 403 "$code"
+code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $VET" "$BASE/api/injuries")
+check "GET /api/injuries as Vet" 200 "$code"
+code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $STABLE" "$BASE/api/users")
+check "GET /api/users as StableAdmin (own staff)" 200 "$code"
+code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $FAN" "$BASE/api/users")
+check "GET /api/users as Racegoer (expect 403)" 403 "$code"
+
+echo "== 5. StableAdmin availability flag gates entries =="
 MEETING=$(curl -s -X POST "$BASE/api/meetings" -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
   -d '{"racetrackId":1,"date":"2030-01-01","gatesOpen":"11:30:00"}')
 MEETING_ID=$(echo "$MEETING" | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
@@ -70,7 +73,16 @@ RACE_ID=$(echo "$RACE" | python3 -c "import sys,json;print(json.load(sys.stdin).
 ENTRY=$(curl -s -X POST "$BASE/api/entries" -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
   -d "{\"raceId\":$RACE_ID,\"racerId\":1,\"trapNumber\":1,\"weightKg\":29.5}")
 ENTRY_ID=$(echo "$ENTRY" | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
-[ -n "$ENTRY_ID" ] && check "POST /api/entries" ok ok || check "POST /api/entries" ok "failed: $ENTRY"
+[ -n "$ENTRY_ID" ] && check "POST /api/entries (flagged available)" ok ok || check "POST /api/entries (flagged available)" ok "failed: $ENTRY"
+
+BLOCKED=$(curl -s -X POST "$BASE/api/entries" -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
+  -d "{\"raceId\":$RACE_ID,\"racerId\":3,\"trapNumber\":3}")
+echo "$BLOCKED" | grep -q "not flagged" && check "entry without availability flag rejected" ok ok || check "entry without availability flag rejected" ok "unexpected: $BLOCKED"
+
+curl -s -o /dev/null -X PUT "$BASE/api/availabilities" -H "Authorization: Bearer $STABLE" -H "Content-Type: application/json" \
+  -d '{"racerId":1,"racetrackId":2,"isAvailable":true}'
+code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/availabilities?trackId=2&available=true")
+check "PUT /api/availabilities then GET" 200 "$code"
 
 code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/api/entries/$ENTRY_ID/result" \
   -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
@@ -86,6 +98,11 @@ INJURY_ID=$(echo "$INJURY" | python3 -c "import sys,json;print(json.load(sys.std
 code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/treatments" -H "Authorization: Bearer $VET" -H "Content-Type: application/json" \
   -d "{\"injuryId\":$INJURY_ID,\"dateAdministered\":\"2030-01-01T00:00:00Z\",\"description\":\"Smoke-test treatment\",\"medication\":\"Test-med\",\"dosage\":\"5ml\",\"withdrawalPeriodDays\":7}")
 check "POST /api/treatments" 200 "$code"
+
+echo "== 7. TrackAdmin provisions an account =="
+NEWUSER=$(curl -s -X POST "$BASE/api/users" -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
+  -d '{"email":"smoke-vet@racing.app","password":"Passw0rd!","firstName":"Smoke","lastName":"Vet","role":"Vet"}')
+echo "$NEWUSER" | grep -qi '"role":\["Vet"\]\|"roles":\["Vet"\]' && check "POST /api/users creates Vet" ok ok || check "POST /api/users creates Vet" ok "unexpected: $NEWUSER"
 
 echo
 echo "RESULT: $PASS passed, $FAIL failed"

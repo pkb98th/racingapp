@@ -1,0 +1,137 @@
+@page "/my-stable"
+@attribute [Authorize(Roles = "StableAdmin")]
+@inject ApiClient Api
+
+<h1>My Stable</h1>
+
+@if (stable is null)
+{
+    <p>Loading stable...</p>
+}
+else
+{
+    <div class="card">
+        <h3>@stable.Name</h3>
+        <p>@(stable.Address ?? "-") &middot; Capacity @stable.Capacity</p>
+    </div>
+
+    <div class="card">
+        <h3>Staff</h3>
+        <p>Trainers and handlers linked to @stable.Name.</p>
+        @if (staffError is not null)
+        {
+            <div class="alert-error">@staffError</div>
+        }
+        @if (staff.Count > 0)
+        {
+            <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+                <tbody>
+                    @foreach (var user in staff)
+                    {
+                        <tr>
+                            <td>@user.FullName</td>
+                            <td>@user.Email</td>
+                            <td>@string.Join(", ", user.Roles)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No staff accounts yet.</p>
+        }
+
+        <h4>Add trainer or handler</h4>
+        <EditForm Model="staffRequest" OnValidSubmit="CreateStaff">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                <div>
+                    <label>First name</label>
+                    <InputText @bind-Value="staffRequest.FirstName" />
+                </div>
+                <div>
+                    <label>Last name</label>
+                    <InputText @bind-Value="staffRequest.LastName" />
+                </div>
+                <div>
+                    <label>Email</label>
+                    <InputText @bind-Value="staffRequest.Email" />
+                </div>
+                <div>
+                    <label>Temporary password</label>
+                    <InputText type="password" @bind-Value="staffRequest.Password" />
+                </div>
+                <div>
+                    <label>Role</label>
+                    <InputSelect @bind-Value="staffRequest.Role">
+                        <option value="@AppRoles.Trainer">Trainer</option>
+                        <option value="@AppRoles.Handler">Handler</option>
+                    </InputSelect>
+                </div>
+            </div>
+            <button type="submit">Add staff member</button>
+        </EditForm>
+    </div>
+
+    <div class="card">
+        <h3>Racers</h3>
+        <p>Racers kenneled here. Open a racer to set track availability flags.</p>
+        @if (racers.Count == 0)
+        {
+            <p>No racers in this stable yet. Add them from the Racers page.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Name</th><th>Kennel no.</th><th>Trainer</th><th>Handler</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var racer in racers)
+                    {
+                        <tr>
+                            <td>@racer.Name</td>
+                            <td>@racer.KennelNumber</td>
+                            <td>@racer.TrainerName</td>
+                            <td>@racer.HandlerName</td>
+                            <td><a class="btn" href="racers/@racer.Id">Manage</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    private StableDto? stable;
+    private List<UserDto> staff = new();
+    private List<RacerDto> racers = new();
+    private CreateUserRequest staffRequest = new();
+    private string? staffError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stable = await Api.GetMyStableAsync();
+        if (stable is null)
+            return;
+
+        staff = (await Api.GetUsersAsync()).Where(u => u.StableId == stable.Id).ToList();
+        racers = (await Api.GetRacersAsync()).Where(r => r.StableId == stable.Id).ToList();
+    }
+
+    private async Task CreateStaff()
+    {
+        staffError = null;
+        try
+        {
+            await Api.CreateUserAsync(staffRequest);
+            staffRequest = new CreateUserRequest();
+            staff = (await Api.GetUsersAsync()).Where(u => u.StableId == stable!.Id).ToList();
+        }
+        catch (ApiError ex)
+        {
+            staffError = ex.Message;
+        }
+    }
+}

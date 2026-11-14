@@ -2,7 +2,7 @@
 @attribute [Authorize(Roles = "Vet,TrackAdmin")]
 @inject ApiClient Api
 
-<h1>Veterinary Care</h1>
+<h1>Vet Care</h1>
 
 <AuthorizeView Context="auth" Roles="Vet">
     <div class="card">
@@ -11,10 +11,6 @@
         {
             <div class="alert-error">@treatmentError</div>
         }
-        @if (treatmentError is null && successMessage is not null)
-        {
-            <div class="alert-success">@successMessage</div>
-        }
         <EditForm Model="treatmentRequest" OnValidSubmit="CreateTreatment">
             <DataAnnotationsValidator />
             <div class="form-grid">
@@ -22,9 +18,9 @@
                     <label>Injury</label>
                     <InputSelect @bind-Value="treatmentRequest.InjuryId">
                         <option value="0">Select injury...</option>
-                        @foreach (var injury in (injuries ?? new List<InjuryDto>()).Where(i => i.Status != InjuryStatus.Cleared))
+                        @foreach (var injury in injuries)
                         {
-                            <option value="@injury.Id">@injury.RacerName &mdash; @injury.Description (@injury.DateReported.ToString("dd MMM"))</option>
+                            <option value="@injury.Id">@injury.RacerName &mdash; @injury.Description (@injury.Status)</option>
                         }
                     </InputSelect>
                 </div>
@@ -64,7 +60,7 @@
 }
 else if (injuries.Count == 0)
 {
-    <p>No injuries on record.</p>
+    <p>No injuries recorded.</p>
 }
 else
 {
@@ -73,10 +69,10 @@ else
             <tr>
                 <th>Reported</th>
                 <th>Racer</th>
+                <th>Description</th>
                 <th>Severity</th>
                 <th>Status</th>
-                <th>Description</th>
-                <th>Vet</th>
+                <th>Reported by</th>
                 <th>Treatments</th>
                 <th></th>
             </tr>
@@ -87,17 +83,14 @@ else
                 <tr>
                     <td>@injury.DateReported.ToString("dd MMM yyyy")</td>
                     <td><a href="racers/@injury.RacerId">@injury.RacerName</a></td>
-                    <td><span class="badge @(injury.Severity == InjurySeverity.Severe ? "bad" : injury.Severity == InjurySeverity.Moderate ? "warn" : "ok")">@injury.Severity</span></td>
-                    <td>@injury.Status</td>
-                    <td>@injury.Description</td>
-                    <td>@injury.VetName</td>
+                    <td>@injury.Description @(string.IsNullOrEmpty(injury.BodyPart) ? "" : $"({injury.BodyPart})")</td>
+                    <td><span class="badge">@injury.Severity</span></td>
+                    <td><span class="badge">@injury.Status</span></td>
+                    <td>@injury.ReportedByName</td>
                     <td>@injury.Treatments.Count</td>
                     <td>
                         <AuthorizeView Context="auth" Roles="Vet">
-                            @if (injury.Status != InjuryStatus.Cleared)
-                            {
-                                <button class="secondary" @onclick="() => MarkCleared(injury)">Mark cleared</button>
-                            }
+                            <button class="secondary" @onclick="() => MarkCleared(injury)">Mark cleared</button>
                         </AuthorizeView>
                     </td>
                 </tr>
@@ -110,7 +103,6 @@ else
     private List<InjuryDto>? injuries;
     private CreateTreatmentRequest treatmentRequest = new();
     private string? treatmentError;
-    private string? successMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,13 +119,11 @@ else
     private async Task CreateTreatment()
     {
         treatmentError = null;
-        successMessage = null;
         try
         {
             await Api.CreateTreatmentAsync(treatmentRequest);
             treatmentRequest = new CreateTreatmentRequest();
             injuries = await Api.GetInjuriesAsync();
-            successMessage = "Treatment recorded.";
         }
         catch (ApiError ex)
         {

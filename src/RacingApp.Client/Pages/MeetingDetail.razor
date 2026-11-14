@@ -65,7 +65,7 @@ else
                     <span class="badge">@race.Grade</span>
                 }
                 <span class="badge">@(race.ScheduledTime.ToString("HH:mm"))</span>
-                <span class="badge @(race.Status == RaceStatus.Resulted ? "ok" : "")">@race.Status</span>
+                <span class="badge">@race.Status</span>
             </h3>
             <p>Prize: @race.PrizeMoney.ToString("N0")</p>
 
@@ -76,8 +76,7 @@ else
                         <tr>
                             <th>Trap</th>
                             <th>Racer</th>
-                            <th>Trainer</th>
-                            <th>Handler</th>
+                            <th>Stable</th>
                             <th>Weight (kg)</th>
                             <th>Status</th>
                             <th>Finish</th>
@@ -91,8 +90,7 @@ else
                             <tr>
                                 <td>@entry.TrapNumber</td>
                                 <td><a href="racers/@entry.RacerId">@entry.RacerName</a></td>
-                                <td>@entry.TrainerName</td>
-                                <td>@entry.HandlerName</td>
+                                <td>@entry.StableName</td>
                                 <td>@entry.WeightKg?.ToString("0.0")</td>
                                 <td><span class="badge">@entry.Status</span></td>
                                 <td>@(entry.FinishPosition?.ToString() ?? "-")</td>
@@ -107,7 +105,7 @@ else
                             @if (resultEntryId == entry.Id)
                             {
                                 <tr>
-                                    <td colspan="9">
+                                    <td colspan="8">
                                         <EditForm Model="resultRequest" OnValidSubmit="SaveResult">
                                             <DataAnnotationsValidator />
                                             <div class="form-grid">
@@ -150,32 +148,12 @@ else
                         <DataAnnotationsValidator />
                         <div class="form-grid">
                             <div>
-                                <label>Racer</label>
+                                <label>Racer (flagged available for this track)</label>
                                 <InputSelect @bind-Value="entryRequest.RacerId">
                                     <option value="0">Select racer...</option>
-                                    @foreach (var racer in racers)
+                                    @foreach (var r in availableRacers)
                                     {
-                                        <option value="@racer.Id">@racer.Name</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div>
-                                <label>Trainer</label>
-                                <InputSelect @bind-Value="entryRequest.TrainerId">
-                                    <option value="">(none)</option>
-                                    @foreach (var trainer in trainers)
-                                    {
-                                        <option value="@trainer.Id">@trainer.FullName</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div>
-                                <label>Handler</label>
-                                <InputSelect @bind-Value="entryRequest.HandlerId">
-                                    <option value="">(none)</option>
-                                    @foreach (var handler in handlers)
-                                    {
-                                        <option value="@handler.Id">@handler.FullName</option>
+                                        <option value="@r.RacerId">@r.RacerName (@r.StableName)</option>
                                     }
                                 </InputSelect>
                             </div>
@@ -202,9 +180,7 @@ else
     public int Id { get; set; }
 
     private RaceMeetingDto? meeting;
-    private List<RacerDto> racers = new();
-    private List<TrainerDto> trainers = new();
-    private List<HandlerDto> handlers = new();
+    private List<AvailabilityDto> availableRacers = new();
 
     private CreateRaceRequest raceRequest = new();
     private string? raceError;
@@ -228,9 +204,7 @@ else
             return;
         }
 
-        racers = await Api.GetRacersAsync();
-        trainers = await Api.GetTrainersAsync();
-        handlers = await Api.GetHandlersAsync();
+        availableRacers = await Api.GetAvailabilitiesAsync(meeting.RacetrackId, available: true);
     }
 
     private async Task CreateRace()

@@ -1,0 +1,153 @@
+@page "/accounts"
+@attribute [Authorize(Roles = "TrackAdmin")]
+@inject ApiClient Api
+
+<h1>Accounts</h1>
+<p>Create accounts for stables, owners, trainers, handlers and vets. Public signups are always Racegoers.</p>
+
+<div class="card">
+    <h3>Create account</h3>
+    @if (createError is not null)
+    {
+        <div class="alert-error">@createError</div>
+    }
+    <EditForm Model="createRequest" OnValidSubmit="CreateUser">
+        <DataAnnotationsValidator />
+        <div class="form-grid">
+            <div>
+                <label>First name</label>
+                <InputText @bind-Value="createRequest.FirstName" />
+            </div>
+            <div>
+                <label>Last name</label>
+                <InputText @bind-Value="createRequest.LastName" />
+            </div>
+            <div>
+                <label>Email</label>
+                <InputText @bind-Value="createRequest.Email" />
+            </div>
+            <div>
+                <label>Temporary password</label>
+                <InputText type="password" @bind-Value="createRequest.Password" />
+            </div>
+            <div>
+                <label>Role</label>
+                <InputSelect @bind-Value="createRequest.Role">
+                    <option value="@AppRoles.StableAdmin">Stable admin</option>
+                    <option value="@AppRoles.Owner">Owner</option>
+                    <option value="@AppRoles.Trainer">Trainer</option>
+                    <option value="@AppRoles.Handler">Handler</option>
+                    <option value="@AppRoles.Vet">Vet</option>
+                    <option value="@AppRoles.TrackAdmin">Track admin</option>
+                    <option value="@AppRoles.Racegoer">Racegoer</option>
+                </InputSelect>
+            </div>
+            <div>
+                <label>Stable (trainers and handlers only)</label>
+                <InputSelect @bind-Value="createRequest.StableId">
+                    <option value="">(none)</option>
+                    @foreach (var stable in stables)
+                    {
+                        <option value="@stable.Id">@stable.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <button type="submit">Create account</button>
+    </EditForm>
+</div>
+
+<div class="card">
+    <h3>All users</h3>
+    @if (users is null)
+    {
+        <p>Loading users...</p>
+    }
+    else
+    {
+        <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Stable</th><th>Change role</th></tr></thead>
+            <tbody>
+                @foreach (var user in users)
+                {
+                    <tr>
+                        <td>@user.FullName</td>
+                        <td>@user.Email</td>
+                        <td>@string.Join(", ", user.Roles)</td>
+                        <td>@user.StableName</td>
+                        <td>
+                            <InputSelect @bind-Value="roleSelections[user.Id]">
+                                <option value="@AppRoles.TrackAdmin">Track admin</option>
+                                <option value="@AppRoles.StableAdmin">Stable admin</option>
+                                <option value="@AppRoles.Owner">Owner</option>
+                                <option value="@AppRoles.Trainer">Trainer</option>
+                                <option value="@AppRoles.Handler">Handler</option>
+                                <option value="@AppRoles.Vet">Vet</option>
+                                <option value="@AppRoles.Racegoer">Racegoer</option>
+                            </InputSelect>
+                            <button class="secondary" @onclick="() => SaveRole(user)">Apply</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    @if (roleError is not null)
+    {
+        <div class="alert-error">@roleError</div>
+    }
+</div>
+
+@code {
+    private List<UserDto>? users;
+    private List<StableDto> stables = new();
+    private CreateUserRequest createRequest = new();
+    private Dictionary<string, string> roleSelections = new();
+    private string? createError;
+    private string? roleError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Api.GetUsersAsync();
+        stables = await Api.GetStablesAsync();
+        if (users is not null)
+        {
+            foreach (var user in users)
+                roleSelections[user.Id] = user.Roles.FirstOrDefault() ?? AppRoles.Racegoer;
+        }
+    }
+
+    private async Task CreateUser()
+    {
+        createError = null;
+        try
+        {
+            await Api.CreateUserAsync(createRequest);
+            createRequest = new CreateUserRequest();
+            users = await Api.GetUsersAsync();
+            if (users is not null)
+            {
+                foreach (var user in users)
+                    roleSelections[user.Id] = user.Roles.FirstOrDefault() ?? AppRoles.Racegoer;
+            }
+        }
+        catch (ApiError ex)
+        {
+            createError = ex.Message;
+        }
+    }
+
+    private async Task SaveRole(UserDto user)
+    {
+        roleError = null;
+        try
+        {
+            await Api.SetUserRoleAsync(user.Id, roleSelections[user.Id]);
+            users = await Api.GetUsersAsync();
+        }
+        catch (ApiError ex)
+        {
+            roleError = ex.Message;
+        }
+    }
+}

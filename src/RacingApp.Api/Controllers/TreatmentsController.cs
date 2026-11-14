@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +10,7 @@ namespace RacingApp.Api.Controllers;
 
 [ApiController]
 [Route("api/treatments")]
-[Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.Owner},{AppRoles.Trainer},{AppRoles.Vet}")]
+[Authorize]
 public class TreatmentsController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -21,10 +20,13 @@ public class TreatmentsController : ControllerBase
     [HttpGet("injury/{injuryId:int}")]
     public async Task<ActionResult<IEnumerable<TreatmentDto>>> GetByInjury(int injuryId)
     {
+        if (User.IsInRole(AppRoles.Racegoer) && !User.IsInRole(AppRoles.TrackAdmin))
+            return Forbid();
+
         var treatments = await _db.Treatments
-            .Include(t => t.Vet)
+            .Include(t => t.AdministeredBy)
             .Where(t => t.InjuryId == injuryId)
-            .OrderByDescending(t => t.DateAdministered)
+            .OrderBy(t => t.DateAdministered)
             .ToListAsync();
         return treatments.Select(t => t.ToDto()).ToList();
     }
@@ -37,29 +39,25 @@ public class TreatmentsController : ControllerBase
         if (injury is null)
             return BadRequest(new { message = "Unknown injury." });
 
-        var vet = await _db.Vets.FirstOrDefaultAsync(v => v.AppUserId == UserId());
-        if (vet is null)
-            return Forbid();
+        var person = await CurrentUser.PersonAsync(_db, User);
 
         var treatment = new Treatment
         {
             InjuryId = request.InjuryId,
-            VetId = vet.Id,
             DateAdministered = request.DateAdministered,
             Description = request.Description,
             Medication = request.Medication,
             Dosage = request.Dosage,
             WithdrawalPeriodDays = request.WithdrawalPeriodDays,
-            FollowUpDate = request.FollowUpDate
+            FollowUpDate = request.FollowUpDate,
+            AdministeredByPersonId = person?.Id
         };
+
         _db.Treatments.Add(treatment);
-
-        if (injury.Status != InjuryStatus.Cleared)
-            injury.Status = InjuryStatus.InTreatment;
-
+        injury.Status = InjuryStatus.InTreatment;
         await _db.SaveChangesAsync();
-        return Ok(treatment.ToDto());
-    }
 
-    private string UserId() => User.FindFirstValue("sub") ?? string.Empty;
+        treatment.AdministeredBy = person;
+        return CreatedAtAction(nameof(GetByInjury), new { injuryId = treatment.InjuryId }, treatment.ToDto());
+    }
 }

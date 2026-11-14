@@ -9,6 +9,7 @@ using RacingApp.Api.Data;
 using RacingApp.Api.Models;
 using RacingApp.Shared;
 using RacingApp.Shared.Dtos;
+using RacingApp.Shared.Entities;
 
 namespace RacingApp.Api.Controllers;
 
@@ -19,15 +20,18 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IConfiguration _configuration;
+    private readonly AppDbContext _db;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        AppDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _configuration = configuration;
+        _db = db;
     }
 
     [HttpPost("register")]
@@ -42,7 +46,7 @@ public class AuthController : ControllerBase
             UserName = request.Email,
             Email = request.Email,
             EmailConfirmed = true,
-            FullName = request.FullName
+            FullName = $"{request.FirstName} {request.LastName}".Trim()
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -50,6 +54,15 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = string.Join(" ", result.Errors.Select(e => e.Description)) });
 
         await _userManager.AddToRoleAsync(user, AppRoles.Racegoer);
+
+        _db.People.Add(new Person
+        {
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            AppUserId = user.Id
+        });
+        await _db.SaveChangesAsync();
 
         return await BuildAuthResponseAsync(user);
     }

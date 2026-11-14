@@ -22,12 +22,6 @@ public static class DbSeeder
                 await roleManager.CreateAsync(new IdentityRole(role));
         }
 
-        var admin = await EnsureUserAsync(userManager, "admin@racing.app", "Sam Trackadmin", AppRoles.TrackAdmin);
-        var ownerUser = await EnsureUserAsync(userManager, "owner@racing.app", "Olive Owner", AppRoles.Owner);
-        var trainerUser = await EnsureUserAsync(userManager, "trainer@racing.app", "Tara Trainer", AppRoles.Trainer);
-        var vetUser = await EnsureUserAsync(userManager, "vet@racing.app", "Vince Vet", AppRoles.Vet);
-        var fanUser = await EnsureUserAsync(userManager, "fan@racing.app", "Fiona Fan", AppRoles.Racegoer);
-
         if (await db.Racetracks.AnyAsync())
             return;
 
@@ -54,111 +48,75 @@ public static class DbSeeder
         db.Stables.AddRange(stable1, stable2);
         await db.SaveChangesAsync();
 
-        var trainer = new Trainer
-        {
-            FirstName = "Tara",
-            LastName = "Trainer",
-            LicenseNumber = "TR-2024-018",
-            Email = "trainer@racing.app",
-            Phone = "555-0102",
-            StableId = stable1.Id,
-            AppUserId = trainerUser.Id
-        };
-        var trainer2 = new Trainer
-        {
-            FirstName = "Hank",
-            LastName = "Holloway",
-            LicenseNumber = "TR-2023-101",
-            Email = "hank@windrushkennels.example",
-            Phone = "555-0110",
-            StableId = stable2.Id
-        };
-        var owner = new Owner
-        {
-            FirstName = "Olive",
-            LastName = "Owner",
-            Email = "owner@racing.app",
-            Phone = "555-0101",
-            AppUserId = ownerUser.Id
-        };
-        var owner2 = new Owner
-        {
-            FirstName = "Desmond",
-            LastName = "Doyle",
-            Email = "des.doyle@example.com",
-            Phone = "555-0109"
-        };
-        var vet = new Vet
-        {
-            FirstName = "Vince",
-            LastName = "Vet",
-            LicenseNumber = "VET-88231",
-            ClinicName = "Trackside Veterinary Clinic",
-            Phone = "555-0103",
-            AppUserId = vetUser.Id
-        };
-        db.Trainers.AddRange(trainer, trainer2);
-        db.Owners.AddRange(owner, owner2);
-        db.Vets.Add(vet);
-        await db.SaveChangesAsync();
+        var admin = await EnsureUserAsync(userManager, db, "admin@racing.app", "Sam", "Trackadmin", AppRoles.TrackAdmin);
+        var stableAdmin1 = await EnsureUserAsync(userManager, db, "stable@racing.app", "Steve", "Stableman", AppRoles.StableAdmin, stable1.Id);
+        var stableAdmin2 = await EnsureUserAsync(userManager, db, "stable2@racing.app", "Stella", "Kennel", AppRoles.StableAdmin, stable2.Id);
+        var ownerUser = await EnsureUserAsync(userManager, db, "owner@racing.app", "Olive", "Owner", AppRoles.Owner);
+        var trainerUser = await EnsureUserAsync(userManager, db, "trainer@racing.app", "Tara", "Trainer", AppRoles.Trainer, stable1.Id);
+        var handlerUser = await EnsureUserAsync(userManager, db, "handler@racing.app", "Hank", "Handler", AppRoles.Handler, stable1.Id);
+        var vetUser = await EnsureUserAsync(userManager, db, "vet@racing.app", "Vince", "Vet", AppRoles.Vet);
+        var fanUser = await EnsureUserAsync(userManager, db, "fan@racing.app", "Fiona", "Fan", AppRoles.Racegoer);
 
-        var handler = new Handler { FirstName = "Molly", LastName = "Marsh", Phone = "555-0104", TrainerId = trainer.Id };
-        var handler2 = new Handler { FirstName = "Piotr", LastName = "Nowak", Phone = "555-0105", TrainerId = trainer2.Id };
-        db.Handlers.AddRange(handler, handler2);
+        var ownerPerson = await db.People.SingleAsync(p => p.AppUserId == ownerUser.Id);
+        var trainerPerson = await db.People.SingleAsync(p => p.AppUserId == trainerUser.Id);
+        var handlerPerson = await db.People.SingleAsync(p => p.AppUserId == handlerUser.Id);
 
         var racer1 = new Racer
         {
-            Name = "Bolt From Blue",
-            KennelNumber = "WR-001",
+            Name = "Breeze On By",
+            KennelNumber = "W-01",
             DateOfBirth = new DateOnly(2021, 4, 12),
-            Sex = RacerSex.Male,
+            Sex = RacerSex.Bitch,
             Breed = "Greyhound",
-            Color = "Blue Brindle",
-            MicrochipNumber = "985112009101558",
-            WeightKg = 31.5m,
+            Color = "Black",
+            MicrochipNumber = "985100001111111",
+            WeightKg = 28.6m,
             StableId = stable1.Id,
-            TrainerId = trainer.Id
+            TrainerPersonId = trainerPerson.Id,
+            HandlerPersonId = handlerPerson.Id
         };
         var racer2 = new Racer
         {
-            Name = "Sable Whisper",
-            KennelNumber = "WR-002",
-            DateOfBirth = new DateOnly(2022, 1, 30),
-            Sex = RacerSex.Female,
+            Name = "Midnight Dash",
+            KennelNumber = "W-02",
+            DateOfBirth = new DateOnly(2020, 11, 3),
+            Sex = RacerSex.Dog,
             Breed = "Greyhound",
-            Color = "Black",
-            MicrochipNumber = "985112009101559",
-            WeightKg = 28.9m,
+            Color = "Brindle",
+            MicrochipNumber = "985100002222222",
+            WeightKg = 31.2m,
             StableId = stable1.Id,
-            TrainerId = trainer.Id
+            TrainerPersonId = trainerPerson.Id
         };
         var racer3 = new Racer
         {
-            Name = "Tidal Dash",
-            KennelNumber = "SV-001",
-            DateOfBirth = new DateOnly(2020, 11, 5),
-            Sex = RacerSex.Male,
+            Name = "Coastal Flyer",
+            KennelNumber = "S-01",
+            DateOfBirth = new DateOnly(2021, 8, 25),
+            Sex = RacerSex.Dog,
             Breed = "Greyhound",
             Color = "Fawn",
-            MicrochipNumber = "985112009101560",
-            WeightKg = 32.2m,
-            StableId = stable2.Id,
-            TrainerId = trainer2.Id
+            WeightKg = 30.1m,
+            StableId = stable2.Id
         };
         db.Racers.AddRange(racer1, racer2, racer3);
         await db.SaveChangesAsync();
 
         db.RacerOwnerships.AddRange(
-            new RacerOwnership { RacerId = racer1.Id, OwnerId = owner.Id, SharePercent = 100m },
-            new RacerOwnership { RacerId = racer2.Id, OwnerId = owner.Id, SharePercent = 50m },
-            new RacerOwnership { RacerId = racer2.Id, OwnerId = owner2.Id, SharePercent = 50m },
-            new RacerOwnership { RacerId = racer3.Id, OwnerId = owner2.Id, SharePercent = 100m });
+            new RacerOwnership { RacerId = racer1.Id, OwnerPersonId = ownerPerson.Id, SharePercent = 100m },
+            new RacerOwnership { RacerId = racer2.Id, OwnerPersonId = ownerPerson.Id, SharePercent = 100m });
+
+        db.RacerAvailabilities.AddRange(
+            new RacerAvailability { RacerId = racer1.Id, RacetrackId = track1.Id, IsAvailable = true },
+            new RacerAvailability { RacerId = racer2.Id, RacetrackId = track1.Id, IsAvailable = true },
+            new RacerAvailability { RacerId = racer2.Id, RacetrackId = track2.Id, IsAvailable = true },
+            new RacerAvailability { RacerId = racer3.Id, RacetrackId = track2.Id, IsAvailable = true });
 
         var meeting = new RaceMeeting
         {
             RacetrackId = track1.Id,
-            Date = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(3)),
-            GatesOpen = new TimeOnly(17, 30),
+            Date = DateOnly.FromDateTime(DateTime.Today.AddDays(7)),
+            GatesOpen = new TimeOnly(11, 30),
             Status = MeetingStatus.Scheduled
         };
         db.RaceMeetings.Add(meeting);
@@ -169,36 +127,37 @@ public static class DbSeeder
             RaceMeetingId = meeting.Id,
             RaceNumber = 1,
             DistanceMeters = 480,
-            Grade = "A3",
-            PrizeMoney = 750m,
-            ScheduledTime = new TimeOnly(18, 15)
+            Grade = "A5",
+            PrizeMoney = 1200m,
+            ScheduledTime = new TimeOnly(14, 0),
+            Status = RaceStatus.Scheduled
         };
         var race2 = new Race
         {
             RaceMeetingId = meeting.Id,
             RaceNumber = 2,
             DistanceMeters = 480,
-            Grade = "A5",
-            PrizeMoney = 500m,
-            ScheduledTime = new TimeOnly(18, 36)
+            Grade = "A3",
+            PrizeMoney = 1800m,
+            ScheduledTime = new TimeOnly(14, 30),
+            Status = RaceStatus.Scheduled
         };
         db.Races.AddRange(race1, race2);
         await db.SaveChangesAsync();
 
         db.RaceEntries.AddRange(
-            new RaceEntry { RaceId = race1.Id, RacerId = racer1.Id, TrainerId = trainer.Id, HandlerId = handler.Id, TrapNumber = 1, WeightKg = 31.5m },
-            new RaceEntry { RaceId = race1.Id, RacerId = racer3.Id, TrainerId = trainer2.Id, HandlerId = handler2.Id, TrapNumber = 2, WeightKg = 32.2m },
-            new RaceEntry { RaceId = race2.Id, RacerId = racer2.Id, TrainerId = trainer.Id, HandlerId = handler.Id, TrapNumber = 3, WeightKg = 28.9m });
+            new RaceEntry { RaceId = race1.Id, RacerId = racer1.Id, TrapNumber = 1, WeightKg = 28.6m, Status = EntryStatus.Entered },
+            new RaceEntry { RaceId = race1.Id, RacerId = racer2.Id, TrapNumber = 2, WeightKg = 31.2m, Status = EntryStatus.Entered });
 
         var injury = new Injury
         {
-            RacerId = racer3.Id,
-            VetId = vet.Id,
-            DateReported = DateTime.UtcNow.AddDays(-10),
-            Description = "Slight right fore pad abrasion after trial",
-            BodyPart = "Right fore paw",
+            RacerId = racer2.Id,
+            DateReported = DateTime.UtcNow.AddDays(-2),
+            Description = "Slight strain in right shoulder after gallop",
+            BodyPart = "Right shoulder",
             Severity = InjurySeverity.Minor,
-            Status = InjuryStatus.Recovering
+            Status = InjuryStatus.InTreatment,
+            ReportedByPersonId = trainerPerson.Id
         };
         db.Injuries.Add(injury);
         await db.SaveChangesAsync();
@@ -206,12 +165,11 @@ public static class DbSeeder
         db.Treatments.Add(new Treatment
         {
             InjuryId = injury.Id,
-            VetId = vet.Id,
-            DateAdministered = DateTime.UtcNow.AddDays(-9),
-            Description = "Cleaned wound, applied antiseptic dressing",
-            Medication = "Topical antiseptic",
-            Dosage = "Once daily",
-            WithdrawalPeriodDays = 0,
+            DateAdministered = DateTime.UtcNow.AddDays(-1),
+            Description = "Anti-inflammatory course and rest",
+            Medication = "Carprofen",
+            Dosage = "50mg twice daily",
+            WithdrawalPeriodDays = 5,
             FollowUpDate = DateTime.UtcNow.AddDays(4)
         });
 
@@ -219,7 +177,13 @@ public static class DbSeeder
     }
 
     private static async Task<ApplicationUser> EnsureUserAsync(
-        UserManager<ApplicationUser> userManager, string email, string fullName, string role)
+        UserManager<ApplicationUser> userManager,
+        AppDbContext db,
+        string email,
+        string firstName,
+        string lastName,
+        string role,
+        int? stableId = null)
     {
         var existing = await userManager.FindByEmailAsync(email);
         if (existing is not null)
@@ -230,13 +194,21 @@ public static class DbSeeder
             UserName = email,
             Email = email,
             EmailConfirmed = true,
-            FullName = fullName
+            FullName = $"{firstName} {lastName}"
         };
-        var result = await userManager.CreateAsync(user, SeedPassword);
-        if (!result.Succeeded)
-            throw new InvalidOperationException($"Failed to seed user {email}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-
+        await userManager.CreateAsync(user, SeedPassword);
         await userManager.AddToRoleAsync(user, role);
+
+        db.People.Add(new Person
+        {
+            FirstName = firstName,
+            LastName = lastName,
+            Email = email,
+            StableId = stableId,
+            AppUserId = user.Id
+        });
+        await db.SaveChangesAsync();
+
         return user;
     }
 }
