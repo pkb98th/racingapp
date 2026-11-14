@@ -34,6 +34,8 @@ src/
 
 ## Domain model
 
+A draw.io-importable diagram of the domain model is at `docs/design/domain-model.drawio` (File → Open in draw.io, or Import).
+
 - **User** 1:1 **Person**; roles live on the user (multi-role supported)
 - **Stable** kennels **Racers**; a racer can switch stables
 - **RacerOwnership** links **Persons with the Owner role** to racers with a share percentage; replacing the ownerships transfers the racer to new owners
