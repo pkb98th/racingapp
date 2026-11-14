@@ -65,15 +65,20 @@ public class RacersController : ControllerBase
             .Include(r => r.Handler)
             .Include(r => r.Ownerships).ThenInclude(o => o.Owner)
             .Include(r => r.Availabilities).ThenInclude(a => a.Racetrack)
-            .Include(r => r.Injuries).ThenInclude(i => i.ReportedBy)
-            .Include(r => r.Injuries).ThenInclude(i => i.Treatments).ThenInclude(t => t.AdministeredBy)
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (racer is null)
             return NotFound();
 
+        var injuries = await _db.Injuries
+            .Include(i => i.ReportedBy)
+            .Include(i => i.Treatments).ThenInclude(t => t.AdministeredBy)
+            .Where(i => i.RacerId == id)
+            .OrderByDescending(i => i.DateReported)
+            .ToListAsync();
+
         var dto = racer.ToDetailDto();
-        dto.Injuries = racer.Injuries.OrderByDescending(i => i.DateReported).Select(i => i.ToDto()).ToList();
+        dto.Injuries = injuries.Select(i => i.ToDto()).ToList();
         return dto;
     }
 
