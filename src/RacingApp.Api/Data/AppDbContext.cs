@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using RacingApp.Api.Models;
 using RacingApp.Shared.Entities;
 
 namespace RacingApp.Api.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -32,12 +34,28 @@ public class AppDbContext : DbContext
             .HasIndex(a => new { a.RacerId, a.RacetrackId })
             .IsUnique();
 
-        modelBuilder.Entity<Racer>().HasOne(r => r.Stable).WithMany().OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Racer>().HasOne(r => r.Trainer).WithMany().OnDelete(DeleteBehavior.SetNull);
-        modelBuilder.Entity<Racer>().HasOne(r => r.Handler).WithMany().OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Racer>()
+            .HasOne(r => r.Stable)
+            .WithMany()
+            .HasForeignKey(r => r.StableId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Racer>()
+            .HasOne(r => r.Trainer)
+            .WithMany()
+            .HasForeignKey(r => r.TrainerPersonId)
+            .OnDelete(DeleteBehavior.NoAction);
+        modelBuilder.Entity<Racer>()
+            .HasOne(r => r.Handler)
+            .WithMany()
+            .HasForeignKey(r => r.HandlerPersonId)
+            .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<RacerOwnership>().HasOne(o => o.Racer).WithMany(r => r.Ownerships).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<RacerOwnership>().HasOne(o => o.Owner).WithMany().OnDelete(DeleteBehavior.Cascade);
-        modelBuilder.Entity<RacerAvailability>().HasOne(a => a.Racer).WithMany().OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RacerAvailability>()
+            .HasOne(a => a.Racer)
+            .WithMany(r => r.Availabilities)
+            .HasForeignKey(a => a.RacerId)
+            .OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<RacerAvailability>().HasOne(a => a.Racetrack).WithMany().OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<RaceMeeting>().HasOne(m => m.Racetrack).WithMany().OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Race>().HasOne(r => r.RaceMeeting).WithMany(m => m.Races).OnDelete(DeleteBehavior.Cascade);
