@@ -154,7 +154,7 @@ public class AppDbContext : DbContext
             .Select(p => p.Name)
             .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var name in entry.OriginalValues.PropertyNames)
+        foreach (var name in entry.OriginalValues.Properties.Select(p => p.Name))
         {
             if (pkNames.Contains(name))
                 continue;
