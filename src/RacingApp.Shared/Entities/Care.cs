@@ -1,6 +1,6 @@
 namespace RacingApp.Shared.Entities;
 
-public class Injury
+public class Injury : VersionedEntity
 {
     public int Id { get; set; }
     public int RacerId { get; set; }
@@ -16,7 +16,7 @@ public class Injury
     public List<Treatment> Treatments { get; set; } = new();
 }
 
-public class Treatment
+public class Treatment : VersionedEntity
 {
     public int Id { get; set; }
     public int InjuryId { get; set; }

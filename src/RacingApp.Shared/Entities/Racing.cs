@@ -1,6 +1,6 @@
 namespace RacingApp.Shared.Entities;
 
-public class Racetrack
+public class Racetrack : VersionedEntity
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -10,7 +10,7 @@ public class Racetrack
     public int Capacity { get; set; }
 }
 
-public class Racer
+public class Racer : VersionedEntity
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -34,7 +34,7 @@ public class Racer
     public List<RacerAvailability> Availabilities { get; set; } = new();
 }
 
-public class RacerOwnership
+public class RacerOwnership : VersionedEntity
 {
     public int Id { get; set; }
     public int RacerId { get; set; }
@@ -45,7 +45,7 @@ public class RacerOwnership
     public Person? Owner { get; set; }
 }
 
-public class RacerAvailability
+public class RacerAvailability : VersionedEntity
 {
     public int Id { get; set; }
     public int RacerId { get; set; }
@@ -56,7 +56,7 @@ public class RacerAvailability
     public Racetrack? Racetrack { get; set; }
 }
 
-public class RaceMeeting
+public class RaceMeeting : VersionedEntity
 {
     public int Id { get; set; }
     public int RacetrackId { get; set; }
@@ -68,7 +68,7 @@ public class RaceMeeting
     public List<Race> Races { get; set; } = new();
 }
 
-public class Race
+public class Race : VersionedEntity
 {
     public int Id { get; set; }
     public int RaceMeetingId { get; set; }
@@ -83,7 +83,7 @@ public class Race
     public List<RaceEntry> Entries { get; set; } = new();
 }
 
-public class RaceEntry
+public class RaceEntry : VersionedEntity
 {
     public int Id { get; set; }
     public int RaceId { get; set; }

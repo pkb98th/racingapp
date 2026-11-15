@@ -23,12 +23,35 @@ public class TreatmentsController : ControllerBase
         if (User.IsInRole(AppRoles.Racegoer) && !User.IsInRole(AppRoles.TrackAdmin))
             return Forbid();
 
+        var injury = await _db.Injuries.FirstOrDefaultAsync(i => i.Id == injuryId);
+        if (injury is null)
+            return NotFound();
+
+        var access = await AccessContext.LoadAsync(_db, User);
+        if (!access.ReadsEverything && !access.CanWrite(injury) && !await IsSharedToAsync(access, injury))
+            return NotFound();
+
         var treatments = await _db.Treatments
             .Include(t => t.AdministeredBy)
+            .Include(t => t.OwnerTeam)
             .Where(t => t.InjuryId == injuryId)
             .OrderBy(t => t.DateAdministered)
             .ToListAsync();
         return treatments.Select(t => t.ToDto()).ToList();
+    }
+
+    private async Task<bool> IsSharedToAsync(AccessContext access, Injury injury)
+    {
+        if (access.PersonId is null)
+            return false;
+
+        var entityType = nameof(Injury);
+        var teamIds = access.TeamIds;
+
+        return await _db.RecordShares.AnyAsync(s =>
+            s.EntityType == entityType
+            && s.EntityKey == injury.Key
+            && ((s.ToTeamId != null && teamIds.Contains(s.ToTeamId.Value)) || s.ToPersonId == access.PersonId));
     }
 
     [HttpPost]
@@ -50,7 +73,8 @@ public class TreatmentsController : ControllerBase
             Dosage = request.Dosage,
             WithdrawalPeriodDays = request.WithdrawalPeriodDays,
             FollowUpDate = request.FollowUpDate,
-            AdministeredByPersonId = person?.Id
+            AdministeredByPersonId = person?.Id,
+            OwnerTeamId = injury.OwnerTeamId
         };
 
         _db.Treatments.Add(treatment);

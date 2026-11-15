@@ -11,3 +11,5 @@ public enum EntryStatus { Entered, Scratched, Ran, Withdrawn }
 public enum InjurySeverity { Minor, Moderate, Severe }
 
 public enum InjuryStatus { UnderObservation, InTreatment, Cleared }
+
+public enum SharePermission { Read, Write, All }

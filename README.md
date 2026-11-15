@@ -37,11 +37,33 @@ src/
 A draw.io-importable diagram of the domain model is at `docs/design/domain-model.drawio` (File → Open in draw.io, or Import).
 
 - **User** 1:1 **Person**; roles live on the user (multi-role supported)
+- **Team** groups users (via **TeamMember**) and is linked to a **Stable** or a **Racetrack**; every record belongs to a team
+- **RecordShare** grants another team or user access to a specific record with **Read**, **Write**, or **All** permission
 - **Stable** kennels **Racers**; a racer can switch stables
 - **RacerOwnership** links **Persons with the Owner role** to racers with a share percentage; replacing the ownerships transfers the racer to new owners
 - **RacerAvailability** is a per-(racer, racetrack) flag set by the stable; **TrackAdmin can only enter racers flagged available for the meeting's track** (enforced server-side)
 - **Racetrack** hosts **RaceMeetings** (the schedule) → each meeting has **Races** → **RaceEntry** links a racer with trap number, weight, and (once run) finish position and time
 - **Injuries** (reported by vet/trainer/stable admin) and **Treatments** (vet only, with medication, dosage, withdrawal period, follow-up) hang off racers
+
+## Teams, ownership and record versioning
+
+Every domain record carries audit and ownership fields, enforced centrally in `AppDbContext.SaveChanges`:
+
+| Field | Meaning |
+|---|---|
+| `Key` | Logical identity (GUID) — shared by all versions of the same record |
+| `OwnerTeamId` | The team that owns the record |
+| `StartDate` | UTC timestamp set automatically when the record is inserted |
+| `EndDate` | Null for the current version; set when the record is superseded |
+| `CreatedByUserId` | Identity user that created this version |
+
+- **Insert**: `StartDate`, `EndDate = null` and the creating user are stamped automatically.
+- **Update**: a copy of the original record is written with `EndDate` = now (a closed historical version); the current row keeps its `Id` and `Key` so references stay stable, and gets a new `StartDate` and creating user.
+- Queries only ever see current versions (a global `EndDate == null` filter is applied to every versioned entity).
+
+**Team access**: records are readable/writable by members of their owning team. Admins, vets and racegoers are not team-restricted when reading (racegoers see the public schedule; vets see all clinical records). Records can additionally be shared to other teams or users with **Read**, **Write** or **All** permission via `api/shares` (or the Sharing card on a racer's page). Creating a racetrack or stable automatically creates a linked team.
+
+> Note: the schema changed with this feature. Existing local databases created by `EnsureCreated` must be deleted so the new schema is created on next start (seed data is recreated automatically).
 
 ## Seeded demo accounts (password `Passw0rd!`)
 

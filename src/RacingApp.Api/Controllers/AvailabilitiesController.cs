@@ -22,9 +22,14 @@ public class AvailabilitiesController : ControllerBase
         [FromQuery] int? trackId,
         [FromQuery] bool? available)
     {
+        var access = await AccessContext.LoadAsync(_db, User);
+
         var query = _db.RacerAvailabilities
             .Include(a => a.Racer).ThenInclude(r => r!.Stable)
+            .Include(a => a.OwnerTeam)
             .AsQueryable();
+
+        query = access.FilterReadable(query, _db);
 
         if (trackId.HasValue)
             query = query.Where(a => a.RacetrackId == trackId.Value);
@@ -46,12 +51,9 @@ public class AvailabilitiesController : ControllerBase
         if (!await _db.Racetracks.AnyAsync(t => t.Id == request.RacetrackId))
             return NotFound(new { message = "Racetrack not found." });
 
-        if (User.IsInRole(AppRoles.StableAdmin) && !User.IsInRole(AppRoles.TrackAdmin))
-        {
-            var person = await CurrentUser.PersonAsync(_db, User);
-            if (person?.StableId is null || racer.StableId != person.StableId)
-                return Forbid();
-        }
+        var access = await AccessContext.LoadAsync(_db, User);
+        if (!await access.CanWriteAsync(_db, racer))
+            return Forbid();
 
         var existing = await _db.RacerAvailabilities
             .FirstOrDefaultAsync(a => a.RacerId == request.RacerId && a.RacetrackId == request.RacetrackId);
@@ -61,7 +63,8 @@ public class AvailabilitiesController : ControllerBase
             {
                 RacerId = request.RacerId,
                 RacetrackId = request.RacetrackId,
-                IsAvailable = request.IsAvailable
+                IsAvailable = request.IsAvailable,
+                OwnerTeamId = racer.OwnerTeamId
             });
         else
             existing.IsAvailable = request.IsAvailable;

@@ -1,11 +1,18 @@
+using System.Linq.Expressions;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using RacingApp.Shared.Entities;
 
 namespace RacingApp.Api.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    private readonly IHttpContextAccessor _http;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, IHttpContextAccessor http) : base(options)
+        => _http = http;
 
     public DbSet<Person> People => Set<Person>();
     public DbSet<Stable> Stables => Set<Stable>();
@@ -18,6 +25,9 @@ public class AppDbContext : DbContext
     public DbSet<RaceEntry> RaceEntries => Set<RaceEntry>();
     public DbSet<Injury> Injuries => Set<Injury>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<RecordShare> RecordShares => Set<RecordShare>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,11 +36,27 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Person>()
             .HasIndex(p => p.AppUserId)
             .IsUnique()
-            .HasFilter("[AppUserId] IS NOT NULL");
+            .HasFilter("[AppUserId] IS NOT NULL AND [EndDate] IS NULL");
 
         modelBuilder.Entity<RacerAvailability>()
             .HasIndex(a => new { a.RacerId, a.RacetrackId })
+            .IsUnique()
+            .HasFilter("[EndDate] IS NULL");
+
+        modelBuilder.Entity<TeamMember>()
+            .HasIndex(m => new { m.TeamId, m.PersonId })
             .IsUnique();
+
+        modelBuilder.Entity<RecordShare>()
+            .HasIndex(s => new { s.EntityType, s.EntityKey });
+
+        modelBuilder.Entity<Team>().HasOne(t => t.Stable).WithMany().OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Team>().HasOne(t => t.Racetrack).WithMany().OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<TeamMember>().HasOne(m => m.Team).WithMany(t => t.Members).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<TeamMember>().HasOne(m => m.Person).WithMany().OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RecordShare>().HasOne(s => s.ToTeam).WithMany().OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<RecordShare>().HasOne(s => s.ToPerson).WithMany().OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<RecordShare>().HasOne(s => s.GrantedBy).WithMany().OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Racer>().HasOne(r => r.Stable).WithMany().OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Racer>().HasOne(r => r.Trainer).WithMany().OnDelete(DeleteBehavior.SetNull);
@@ -54,5 +80,92 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Race>().Property(r => r.PrizeMoney).HasPrecision(12, 2);
         modelBuilder.Entity<RaceEntry>().Property(e => e.WeightKg).HasPrecision(5, 2);
         modelBuilder.Entity<RaceEntry>().Property(e => e.RaceTimeSeconds).HasPrecision(6, 2);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes()
+                     .Where(t => typeof(VersionedEntity).IsAssignableFrom(t.ClrType)))
+        {
+            var parameter = Expression.Parameter(entityType.ClrType, "e");
+            var body = Expression.Equal(
+                Expression.Property(parameter, nameof(VersionedEntity.EndDate)),
+                Expression.Constant(null, typeof(DateTime?)));
+            modelBuilder.Entity(entityType.ClrType)
+                .HasQueryFilter(Expression.Lambda(body, parameter));
+
+            modelBuilder.Entity(entityType.ClrType)
+                .HasOne(typeof(Team), nameof(VersionedEntity.OwnerTeam))
+                .WithMany()
+                .HasForeignKey(nameof(VersionedEntity.OwnerTeamId))
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity(entityType.ClrType)
+                .HasIndex(nameof(VersionedEntity.Key))
+                .IsUnique()
+                .HasFilter("[EndDate] IS NULL");
+        }
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampAndVersion();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampAndVersion();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void StampAndVersion()
+    {
+        var now = DateTime.UtcNow;
+        var userId = _http.HttpContext?.User.FindFirstValue("sub");
+
+        foreach (var entry in ChangeTracker.Entries<VersionedEntity>().ToList())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                if (entry.Entity.Key == Guid.Empty)
+                    entry.Entity.Key = Guid.NewGuid();
+                entry.Entity.StartDate = now;
+                entry.Entity.EndDate = null;
+                entry.Entity.CreatedByUserId = userId;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                var history = BuildHistoryCopy(entry);
+                history.EndDate = now;
+
+                entry.Entity.StartDate = now;
+                entry.Entity.EndDate = null;
+                entry.Entity.CreatedByUserId = userId;
+
+                Add(history);
+            }
+        }
+    }
+
+    private VersionedEntity BuildHistoryCopy(EntityEntry<VersionedEntity> entry)
+    {
+        var type = entry.Entity.GetType();
+        var clone = (VersionedEntity)Activator.CreateInstance(type)!;
+
+        var pkNames = entry.Metadata.FindPrimaryKey()?.Properties
+            .Select(p => p.Name)
+            .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var name in entry.OriginalValues.Properties.Select(p => p.Name))
+        {
+            if (pkNames.Contains(name))
+                continue;
+
+            var clrProp = type.GetProperty(name);
+            if (clrProp is null || !clrProp.CanWrite)
+                continue;
+
+            clrProp.SetValue(clone, entry.OriginalValues[name]);
+        }
+
+        return clone;
     }
 }

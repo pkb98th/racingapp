@@ -23,11 +23,16 @@ public class InjuriesController : ControllerBase
         if (User.IsInRole(AppRoles.Racegoer) && !User.IsInRole(AppRoles.TrackAdmin))
             return Forbid();
 
+        var access = await AccessContext.LoadAsync(_db, User);
+
         var query = _db.Injuries
             .Include(i => i.Racer)
             .Include(i => i.ReportedBy)
+            .Include(i => i.OwnerTeam)
             .Include(i => i.Treatments).ThenInclude(t => t.AdministeredBy)
             .AsQueryable();
+
+        query = access.FilterReadable(query, _db);
 
         if (racerId.HasValue)
             query = query.Where(i => i.RacerId == racerId.Value);
@@ -40,10 +45,11 @@ public class InjuriesController : ControllerBase
     [Authorize(Roles = $"{AppRoles.Vet},{AppRoles.Trainer},{AppRoles.StableAdmin}")]
     public async Task<ActionResult<InjuryDto>> Create(CreateInjuryRequest request)
     {
-        if (!await _db.Racers.AnyAsync(r => r.Id == request.RacerId))
-            return BadRequest(new { message = "Unknown racer." });
-
         var person = await CurrentUser.PersonAsync(_db, User);
+
+        var racer = await _db.Racers.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.RacerId);
+        if (racer is null)
+            return BadRequest(new { message = "Unknown racer." });
 
         var injury = new Injury
         {
@@ -53,13 +59,14 @@ public class InjuriesController : ControllerBase
             BodyPart = request.BodyPart,
             Severity = request.Severity,
             Status = InjuryStatus.UnderObservation,
-            ReportedByPersonId = person?.Id
+            ReportedByPersonId = person?.Id,
+            OwnerTeamId = racer.OwnerTeamId
         };
 
         _db.Injuries.Add(injury);
         await _db.SaveChangesAsync();
 
-        injury.Racer = await _db.Racers.FindAsync(injury.RacerId);
+        injury.Racer = await _db.Racers.Include(r => r.OwnerTeam).FirstAsync(r => r.Id == injury.RacerId);
         return CreatedAtAction(nameof(GetAll), injury.ToDto());
     }
 

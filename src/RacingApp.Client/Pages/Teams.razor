@@ -1,0 +1,200 @@
+@page "/teams"
+@attribute [Authorize(Roles = "TrackAdmin,StableAdmin")]
+@inject ApiClient Api
+@inject AuthenticationStateProvider AuthState
+@using RacingApp.Shared
+
+<h1>Teams</h1>
+<p>Teams group users and own records. Records are only visible to their owning team unless shared.</p>
+
+@if (error is not null)
+{
+    <div class="alert-error">@error</div>
+}
+
+@if (loading)
+{
+    <p>Loading teams...</p>
+}
+else
+{
+    @if (isTrackAdmin)
+    {
+        <div class="card">
+            <h3>New team</h3>
+            <EditForm Model="createRequest" OnValidSubmit="CreateTeam">
+                <DataAnnotationsValidator />
+                <div class="form-grid">
+                    <div>
+                        <label>Name</label>
+                        <InputText @bind-Value="createRequest.Name" />
+                    </div>
+                    <div>
+                        <label>Linked stable</label>
+                        <InputSelect @bind-Value="createStableId">
+                            <option value="0">(none)</option>
+                            @foreach (var stable in stables)
+                            {
+                                <option value="@stable.Id">@stable.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div>
+                        <label>Linked racetrack</label>
+                        <InputSelect @bind-Value="createTrackId">
+                            <option value="0">(none)</option>
+                            @foreach (var track in tracks)
+                            {
+                                <option value="@track.Id">@track.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+                <button type="submit">Create team</button>
+            </EditForm>
+        </div>
+    }
+
+    @foreach (var team in teams)
+    {
+        <div class="card">
+            <h3>@team.Name</h3>
+            <p>
+                @if (team.StableName is not null)
+                {
+                    <span>Stable: <strong>@team.StableName</strong></span>
+                }
+                @if (team.RacetrackName is not null)
+                {
+                    <span>Track: <strong>@team.RacetrackName</strong></span>
+                }
+            </p>
+
+            @if (team.Members.Count > 0)
+            {
+                <table>
+                    <thead><tr><th>Member</th><th>Email</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var member in team.Members)
+                        {
+                            <tr>
+                                <td>@member.PersonName</td>
+                                <td>@member.Email</td>
+                                <td>
+                                    <button class="secondary" @onclick="() => RemoveMember(team.Id, member.PersonId)">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p>No members yet.</p>
+            }
+
+            <h4>Add member</h4>
+            <div class="form-grid">
+                <div>
+                    <label>User</label>
+                    <select @bind="selectedPersonId">
+                        <option value="0">(choose a user)</option>
+                        @foreach (var user in users.Where(u => u.PersonId.HasValue))
+                        {
+                            <option value="@user.PersonId.Value">@user.FullName (@user.Email)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <button @onclick="() => AddMember(team.Id)">Add member</button>
+        </div>
+    }
+}
+
+@code {
+    private List<TeamDto> teams = new();
+    private List<StableDto> stables = new();
+    private List<RacetrackDto> tracks = new();
+    private List<UserDto> users = new();
+    private CreateTeamRequest createRequest = new();
+    private int createStableId;
+    private int createTrackId;
+    private int selectedPersonId;
+    private bool loading = true;
+    private bool isTrackAdmin;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState.GetAuthenticationStateAsync();
+        isTrackAdmin = authState.User.IsInRole(AppRoles.TrackAdmin);
+
+        try
+        {
+            teams = await Api.GetTeamsAsync();
+            users = await Api.GetUsersAsync();
+
+            if (isTrackAdmin)
+            {
+                stables = await Api.GetStablesAsync();
+                tracks = await Api.GetRacetracksAsync();
+            }
+        }
+        catch (ApiError ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task CreateTeam()
+    {
+        error = null;
+        try
+        {
+            createRequest.StableId = createStableId == 0 ? null : createStableId;
+            createRequest.RacetrackId = createTrackId == 0 ? null : createTrackId;
+            await Api.CreateTeamAsync(createRequest);
+            createRequest = new CreateTeamRequest();
+            teams = await Api.GetTeamsAsync();
+        }
+        catch (ApiError ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task AddMember(int teamId)
+    {
+        if (selectedPersonId == 0)
+            return;
+
+        error = null;
+        try
+        {
+            await Api.AddTeamMemberAsync(teamId, new AddTeamMemberRequest { PersonId = selectedPersonId });
+            teams = await Api.GetTeamsAsync();
+        }
+        catch (ApiError ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task RemoveMember(int teamId, int personId)
+    {
+        error = null;
+        try
+        {
+            await Api.RemoveTeamMemberAsync(teamId, personId);
+            teams = await Api.GetTeamsAsync();
+        }
+        catch (ApiError ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

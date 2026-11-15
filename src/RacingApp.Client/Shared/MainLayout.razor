@@ -14,6 +14,9 @@
             <AuthorizeView Context="auth" Roles="StableAdmin">
                 <NavLink href="my-stable">My Stable</NavLink>
             </AuthorizeView>
+            <AuthorizeView Context="auth" Roles="TrackAdmin,StableAdmin">
+                <NavLink href="teams">Teams</NavLink>
+            </AuthorizeView>
             <AuthorizeView Context="auth" Roles="Vet,TrackAdmin">
                 <NavLink href="vet-care">Vet Care</NavLink>
             </AuthorizeView>

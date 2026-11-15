@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RacingApp.Shared.Dtos;
 
-public class InjuryDto
+public class InjuryDto : RecordAuditDto
 {
     public int Id { get; set; }
     public int RacerId { get; set; }
@@ -24,7 +24,7 @@ public class CreateInjuryRequest
     public InjurySeverity Severity { get; set; } = InjurySeverity.Minor;
 }
 
-public class TreatmentDto
+public class TreatmentDto : RecordAuditDto
 {
     public int Id { get; set; }
     public int InjuryId { get; set; }

@@ -20,11 +20,16 @@ public class RacersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<RacerDto>>> GetAll([FromQuery] string? search)
     {
+        var access = await AccessContext.LoadAsync(_db, User);
+
         var query = _db.Racers
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
             .Include(r => r.Handler)
+            .Include(r => r.OwnerTeam)
             .AsQueryable();
+
+        query = access.FilterReadable(query, _db);
 
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(r => r.Name.Contains(search) || (r.KennelNumber != null && r.KennelNumber.Contains(search)));
@@ -43,7 +48,8 @@ public class RacersController : ControllerBase
         IQueryable<Racer> query = _db.Racers
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
-            .Include(r => r.Handler);
+            .Include(r => r.Handler)
+            .Include(r => r.OwnerTeam);
 
         if (User.IsInRole(AppRoles.Owner))
             query = query.Where(r => r.Ownerships.Any(o => o.OwnerPersonId == person.Id));
@@ -59,15 +65,18 @@ public class RacersController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<RacerDetailDto>> Get(int id)
     {
+        var access = await AccessContext.LoadAsync(_db, User);
+
         var racer = await _db.Racers
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
             .Include(r => r.Handler)
+            .Include(r => r.OwnerTeam)
             .Include(r => r.Ownerships).ThenInclude(o => o.Owner)
             .Include(r => r.Availabilities).ThenInclude(a => a.Racetrack)
             .FirstOrDefaultAsync(r => r.Id == id);
 
-        if (racer is null)
+        if (racer is null || (!access.ReadsEverything && !access.CanWrite(racer) && !await IsSharedToAsync(access, racer)))
             return NotFound();
 
         var injuries = await _db.Injuries
@@ -86,9 +95,17 @@ public class RacersController : ControllerBase
     [Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.StableAdmin}")]
     public async Task<ActionResult<RacerDto>> Create(CreateRacerRequest request)
     {
+        var access = await AccessContext.LoadAsync(_db, User);
+
         var stableId = await ResolveStableAsync(request.StableId);
         if (stableId is null)
             return Forbid();
+
+        var ownerTeamId = await AccessContext.TeamForStableAsync(_db, stableId) is { } stableTeam
+            ? stableTeam.Id
+            : await access.ResolveOwnerTeamIdAsync(_db, request.OwnerTeamId);
+        if (ownerTeamId is null)
+            return BadRequest(new { message = "No team available to own this record. Create a team first." });
 
         var racer = new Racer
         {
@@ -102,14 +119,16 @@ public class RacersController : ControllerBase
             WeightKg = request.WeightKg,
             StableId = stableId.Value,
             TrainerPersonId = request.TrainerPersonId,
-            HandlerPersonId = request.HandlerPersonId
+            HandlerPersonId = request.HandlerPersonId,
+            OwnerTeamId = ownerTeamId
         };
 
         foreach (var share in request.Owners)
             racer.Ownerships.Add(new RacerOwnership
             {
                 OwnerPersonId = share.OwnerPersonId,
-                SharePercent = share.SharePercent
+                SharePercent = share.SharePercent,
+                OwnerTeamId = ownerTeamId
             });
 
         _db.Racers.Add(racer);
@@ -123,9 +142,14 @@ public class RacersController : ControllerBase
     [Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.StableAdmin}")]
     public async Task<IActionResult> Update(int id, UpdateRacerRequest request)
     {
+        var access = await AccessContext.LoadAsync(_db, User);
+
         var racer = await _db.Racers.Include(r => r.Ownerships).FirstOrDefaultAsync(r => r.Id == id);
         if (racer is null)
             return NotFound();
+
+        if (!await access.CanWriteAsync(_db, racer))
+            return Forbid();
 
         if (User.IsInRole(AppRoles.StableAdmin) && !User.IsInRole(AppRoles.TrackAdmin))
         {
@@ -167,11 +191,26 @@ public class RacersController : ControllerBase
             {
                 RacerId = racer.Id,
                 OwnerPersonId = share.OwnerPersonId,
-                SharePercent = share.SharePercent
+                SharePercent = share.SharePercent,
+                OwnerTeamId = racer.OwnerTeamId
             });
 
         await _db.SaveChangesAsync();
         return NoContent();
+    }
+
+    private async Task<bool> IsSharedToAsync(AccessContext access, Racer racer)
+    {
+        if (access.PersonId is null)
+            return false;
+
+        var entityType = nameof(Racer);
+        var teamIds = access.TeamIds;
+
+        return await _db.RecordShares.AnyAsync(s =>
+            s.EntityType == entityType
+            && s.EntityKey == racer.Key
+            && ((s.ToTeamId != null && teamIds.Contains(s.ToTeamId.Value)) || s.ToPersonId == access.PersonId));
     }
 
     private async Task<int?> ResolveStableAsync(int? requestedStableId)
@@ -188,5 +227,6 @@ public class RacersController : ControllerBase
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
             .Include(r => r.Handler)
+            .Include(r => r.OwnerTeam)
             .FirstOrDefaultAsync(r => r.Id == id);
 }
