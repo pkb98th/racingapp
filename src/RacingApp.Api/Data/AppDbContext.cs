@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using RacingApp.Shared.Entities;
 
 namespace RacingApp.Api.Data;
