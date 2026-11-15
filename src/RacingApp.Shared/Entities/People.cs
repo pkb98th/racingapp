@@ -1,6 +1,6 @@
 namespace RacingApp.Shared.Entities;
 
-public class Person
+public class Person : VersionedEntity
 {
     public int Id { get; set; }
     public string FirstName { get; set; } = string.Empty;
@@ -16,7 +16,7 @@ public class Person
     public string DisplayName => $"{FirstName} {LastName}".Trim();
 }
 
-public class Stable
+public class Stable : VersionedEntity
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;

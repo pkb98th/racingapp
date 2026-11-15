@@ -43,7 +43,8 @@ public class RacesController : ControllerBase
             Grade = request.Grade,
             PrizeMoney = request.PrizeMoney,
             ScheduledTime = request.ScheduledTime,
-            Status = RaceStatus.Scheduled
+            Status = RaceStatus.Scheduled,
+            OwnerTeamId = meeting.OwnerTeamId
         };
         _db.Races.Add(race);
         await _db.SaveChangesAsync();

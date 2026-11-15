@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RacingApp.Shared.Dtos;
 
-public class RacerDto
+public class RacerDto : RecordAuditDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -51,6 +51,7 @@ public class CreateRacerRequest
     public int? StableId { get; set; }
     public int? TrainerPersonId { get; set; }
     public int? HandlerPersonId { get; set; }
+    public int? OwnerTeamId { get; set; }
     public List<OwnerShareDto> Owners { get; set; } = new();
 }
 

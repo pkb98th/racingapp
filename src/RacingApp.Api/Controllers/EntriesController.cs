@@ -62,7 +62,8 @@ public class EntriesController : ControllerBase
             RacerId = request.RacerId,
             TrapNumber = request.TrapNumber,
             WeightKg = request.WeightKg ?? racer.WeightKg,
-            Status = EntryStatus.Entered
+            Status = EntryStatus.Entered,
+            OwnerTeamId = race.OwnerTeamId
         };
 
         _db.RaceEntries.Add(entry);

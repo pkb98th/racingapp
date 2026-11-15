@@ -38,6 +38,84 @@ else
             <span>&middot; Handler: @racer.HandlerName</span>
         }
     </p>
+    <p>
+        @if (!string.IsNullOrEmpty(racer.TeamName))
+        {
+            <span>Team: <strong>@racer.TeamName</strong> &middot;</span>
+        }
+        <span>Effective from @racer.StartDate.ToString("dd MMM yyyy HH:mm") UTC</span>
+        @if (racer.EndDate.HasValue)
+        {
+            <span>&middot; Superseded @racer.EndDate.Value.ToString("dd MMM yyyy HH:mm") UTC</span>
+        }
+    </p>
+
+    <AuthorizeView Context="auth" Roles="TrackAdmin,StableAdmin">
+        @if (canManage)
+        {
+            <div class="card">
+                <h3>Sharing</h3>
+                <p>Grant other teams or users access to this racer: read, write, or full control.</p>
+                @if (shareError is not null)
+                {
+                    <div class="alert-error">@shareError</div>
+                }
+                @if (shares.Count > 0)
+                {
+                    <table>
+                        <thead><tr><th>Shared with</th><th>Permission</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var share in shares)
+                            {
+                                <tr>
+                                    <td>@(share.ToTeamName ?? share.ToPersonName)</td>
+                                    <td>@share.Permission</td>
+                                    <td><button class="secondary" @onclick="() => RevokeShare(share.Id)">Revoke</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p>Not shared with anyone else.</p>
+                }
+
+                <h4>Grant access</h4>
+                <div class="form-grid">
+                    <div>
+                        <label>Team</label>
+                        <select @bind="shareTeamId">
+                            <option value="0">(none)</option>
+                            @foreach (var team in allTeams)
+                            {
+                                <option value="@team.Id">@team.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label>User</label>
+                        <select @bind="sharePersonId">
+                            <option value="0">(none)</option>
+                            @foreach (var user in users.Where(u => u.PersonId.HasValue))
+                            {
+                                <option value="@user.PersonId.Value">@user.FullName (@user.Email)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label>Permission</label>
+                        <select @bind="sharePermission">
+                            <option value="@SharePermission.Read">Read</option>
+                            <option value="@SharePermission.Write">Write</option>
+                            <option value="@SharePermission.All">All</option>
+                        </select>
+                    </div>
+                </div>
+                <button @onclick="GrantShare">Grant</button>
+            </div>
+        }
+    </AuthorizeView>
 
     <AuthorizeView Context="auth" Roles="StableAdmin">
         @if (canManage)
@@ -223,6 +301,14 @@ else
     private bool canManage;
     private string? availabilityError;
 
+    private List<RecordShareDto> shares = new();
+    private List<TeamDto> allTeams = new();
+    private List<UserDto> users = new();
+    private int shareTeamId;
+    private int sharePersonId;
+    private SharePermission sharePermission = SharePermission.Read;
+    private string? shareError;
+
     private CreateInjuryRequest injuryRequest = new();
     private string? injuryError;
 
@@ -239,12 +325,70 @@ else
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthState.GetAuthenticationStateAsync();
-        canManage = authState.User.IsInRole(AppRoles.StableAdmin);
+        canManage = authState.User.IsInRole(AppRoles.StableAdmin) || authState.User.IsInRole(AppRoles.TrackAdmin);
 
         tracks = await Api.GetRacetracksAsync();
         racer = await Api.GetRacerAsync(Id);
         if (racer is null)
+        {
             Nav.NavigateTo("racers");
+            return;
+        }
+
+        if (canManage)
+        {
+            try
+            {
+                allTeams = await Api.GetTeamsAsync();
+                users = await Api.GetUsersAsync();
+                shares = await Api.GetSharesAsync(nameof(Racer), racer.Key);
+            }
+            catch (ApiError ex)
+            {
+                shareError = ex.Message;
+            }
+        }
+    }
+
+    private async Task GrantShare()
+    {
+        if (racer is null || (shareTeamId == 0 && sharePersonId == 0))
+            return;
+
+        shareError = null;
+        try
+        {
+            await Api.GrantShareAsync(new CreateShareRequest
+            {
+                EntityType = nameof(Racer),
+                EntityKey = racer.Key,
+                ToTeamId = shareTeamId == 0 ? null : shareTeamId,
+                ToPersonId = sharePersonId == 0 ? null : sharePersonId,
+                Permission = sharePermission
+            });
+            shares = await Api.GetSharesAsync(nameof(Racer), racer.Key);
+        }
+        catch (ApiError ex)
+        {
+            shareError = ex.Message;
+        }
+    }
+
+    private async Task RevokeShare(int shareId)
+    {
+        if (racer is null)
+            return;
+
+        shareError = null;
+        try
+        {
+            await Api.RevokeShareAsync(shareId);
+            shares = await Api.GetSharesAsync(nameof(Racer), racer.Key);
+        }
+        catch (ApiError ex)
+        {
+            shareError = ex.Message;
+        }
     }
 
     private async Task ToggleAvailability(int racetrackId, bool isAvailable)

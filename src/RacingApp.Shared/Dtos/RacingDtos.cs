@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RacingApp.Shared.Dtos;
 
-public class RacetrackDto
+public class RacetrackDto : RecordAuditDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -19,9 +19,10 @@ public class CreateRacetrackRequest
     [Range(50, 5000)] public int TrackLengthMeters { get; set; } = 400;
     public string? Surface { get; set; }
     [Range(1, 200000)] public int Capacity { get; set; } = 1000;
+    public int? OwnerTeamId { get; set; }
 }
 
-public class StableDto
+public class StableDto : RecordAuditDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -34,9 +35,10 @@ public class CreateStableRequest
     [Required] public string Name { get; set; } = string.Empty;
     public string? Address { get; set; }
     [Range(1, 500)] public int Capacity { get; set; } = 20;
+    public int? OwnerTeamId { get; set; }
 }
 
-public class RaceMeetingDto
+public class RaceMeetingDto : RecordAuditDto
 {
     public int Id { get; set; }
     public int RacetrackId { get; set; }
@@ -52,9 +54,10 @@ public class CreateMeetingRequest
     [Required] public int RacetrackId { get; set; }
     [Required] public DateOnly Date { get; set; }
     public TimeOnly? GatesOpen { get; set; }
+    public int? OwnerTeamId { get; set; }
 }
 
-public class RaceDto
+public class RaceDto : RecordAuditDto
 {
     public int Id { get; set; }
     public int RaceMeetingId { get; set; }
@@ -77,7 +80,7 @@ public class CreateRaceRequest
     [Required] public TimeOnly ScheduledTime { get; set; }
 }
 
-public class EntryDto
+public class EntryDto : RecordAuditDto
 {
     public int Id { get; set; }
     public int RaceId { get; set; }
@@ -105,7 +108,7 @@ public class SetResultRequest
     public decimal? RaceTimeSeconds { get; set; }
 }
 
-public class AvailabilityDto
+public class AvailabilityDto : RecordAuditDto
 {
     public int RacerId { get; set; }
     public string RacerName { get; set; } = string.Empty;

@@ -90,6 +90,13 @@ public class UsersController : ControllerBase
 
         await _userManager.AddToRoleAsync(user, request.Role);
 
+        var access = await AccessContext.LoadAsync(_db, User);
+        var ownerTeamId = await AccessContext.TeamForStableAsync(_db, stableId) is { } stableTeam
+            ? stableTeam.Id
+            : await access.ResolveOwnerTeamIdAsync(_db, null);
+        if (ownerTeamId is null)
+            return BadRequest(new { message = "No team available to own this record. Create a team first." });
+
         _db.People.Add(new Person
         {
             FirstName = request.FirstName,
@@ -97,7 +104,8 @@ public class UsersController : ControllerBase
             Email = request.Email,
             Phone = request.Phone,
             StableId = stableId,
-            AppUserId = user.Id
+            AppUserId = user.Id,
+            OwnerTeamId = ownerTeamId
         });
         await _db.SaveChangesAsync();
 
@@ -146,6 +154,7 @@ public class UsersController : ControllerBase
             Email = user.Email ?? string.Empty,
             FullName = user.DisplayName(),
             Roles = roles.ToList(),
+            PersonId = person?.Id,
             StableId = person?.StableId,
             StableName = person?.Stable?.Name
         };

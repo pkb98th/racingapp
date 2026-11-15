@@ -102,6 +102,27 @@ public class ApiClient
     public async Task SetUserRoleAsync(string id, string role) =>
         await PutEmptyAsync($"api/users/{id}/role", new SetRoleRequest { Role = role });
 
+    public async Task<List<TeamDto>> GetTeamsAsync() =>
+        await GetAsync<List<TeamDto>>("api/teams") ?? new();
+
+    public async Task<TeamDto?> CreateTeamAsync(CreateTeamRequest request) =>
+        await PostAsync<TeamDto>("api/teams", request);
+
+    public async Task AddTeamMemberAsync(int teamId, AddTeamMemberRequest request) =>
+        await PostEmptyAsync($"api/teams/{teamId}/members", request);
+
+    public async Task RemoveTeamMemberAsync(int teamId, int personId) =>
+        await DeleteAsync($"api/teams/{teamId}/members/{personId}");
+
+    public async Task<List<RecordShareDto>> GetSharesAsync(string entityType, Guid entityKey) =>
+        await GetAsync<List<RecordShareDto>>($"api/shares?entityType={entityType}&entityKey={entityKey}") ?? new();
+
+    public async Task<RecordShareDto?> GrantShareAsync(CreateShareRequest request) =>
+        await PostAsync<RecordShareDto>("api/shares", request);
+
+    public async Task RevokeShareAsync(int shareId) =>
+        await DeleteAsync($"api/shares/{shareId}");
+
     private async Task SetAuthHeaderAsync()
     {
         var token = await _storage.GetAsync(CustomAuthStateProvider.TokenKey);
@@ -132,6 +153,20 @@ public class ApiClient
     {
         await SetAuthHeaderAsync();
         var response = await _http.PutAsJsonAsync(url, body);
+        await EnsureSuccessAsync(response);
+    }
+
+    private async Task PostEmptyAsync(string url, object body)
+    {
+        await SetAuthHeaderAsync();
+        var response = await _http.PostAsJsonAsync(url, body);
+        await EnsureSuccessAsync(response);
+    }
+
+    private async Task DeleteAsync(string url)
+    {
+        await SetAuthHeaderAsync();
+        var response = await _http.DeleteAsync(url);
         await EnsureSuccessAsync(response);
     }
 

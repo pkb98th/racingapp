@@ -22,6 +22,7 @@ public class MeetingsController : ControllerBase
     {
         var meetings = await _db.RaceMeetings
             .Include(m => m.Racetrack)
+            .Include(m => m.OwnerTeam)
             .OrderBy(m => m.Date)
             .ToListAsync();
         return meetings.Select(m => m.ToDto()).ToList();
@@ -41,12 +42,20 @@ public class MeetingsController : ControllerBase
         if (!await _db.Racetracks.AnyAsync(t => t.Id == request.RacetrackId))
             return BadRequest(new { message = "Unknown racetrack." });
 
+        var access = await AccessContext.LoadAsync(_db, User);
+        var ownerTeamId = await AccessContext.TeamForTrackAsync(_db, request.RacetrackId) is { } trackTeam
+            ? trackTeam.Id
+            : await access.ResolveOwnerTeamIdAsync(_db, request.OwnerTeamId);
+        if (ownerTeamId is null)
+            return BadRequest(new { message = "No team available to own this record. Create a team first." });
+
         var meeting = new RaceMeeting
         {
             RacetrackId = request.RacetrackId,
             Date = request.Date,
             GatesOpen = request.GatesOpen,
-            Status = MeetingStatus.Scheduled
+            Status = MeetingStatus.Scheduled,
+            OwnerTeamId = ownerTeamId
         };
         _db.RaceMeetings.Add(meeting);
         await _db.SaveChangesAsync();
