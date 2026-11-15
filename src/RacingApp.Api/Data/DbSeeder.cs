@@ -72,19 +72,23 @@ public static class DbSeeder
         var vetUser = await EnsureUserAsync(userManager, db, "vet@racing.app", "Vince", "Vet", AppRoles.Vet, null, trackTeam1.Id);
         var fanUser = await EnsureUserAsync(userManager, db, "fan@racing.app", "Fiona", "Fan", AppRoles.Racegoer);
 
-        db.TeamMembers.AddRange(
-            new TeamMember { TeamId = trackTeam1.Id, PersonId = admin.Id },
-            new TeamMember { TeamId = stableTeam1.Id, PersonId = stableAdmin1.Id },
-            new TeamMember { TeamId = stableTeam2.Id, PersonId = stableAdmin2.Id },
-            new TeamMember { TeamId = stableTeam1.Id, PersonId = ownerUser.Id },
-            new TeamMember { TeamId = stableTeam1.Id, PersonId = trainerUser.Id },
-            new TeamMember { TeamId = stableTeam1.Id, PersonId = handlerUser.Id },
-            new TeamMember { TeamId = trackTeam1.Id, PersonId = vetUser.Id });
-        await db.SaveChangesAsync();
-
+        var adminPerson = await db.People.SingleAsync(p => p.AppUserId == admin.Id);
+        var stableAdmin1Person = await db.People.SingleAsync(p => p.AppUserId == stableAdmin1.Id);
+        var stableAdmin2Person = await db.People.SingleAsync(p => p.AppUserId == stableAdmin2.Id);
         var ownerPerson = await db.People.SingleAsync(p => p.AppUserId == ownerUser.Id);
         var trainerPerson = await db.People.SingleAsync(p => p.AppUserId == trainerUser.Id);
         var handlerPerson = await db.People.SingleAsync(p => p.AppUserId == handlerUser.Id);
+        var vetPerson = await db.People.SingleAsync(p => p.AppUserId == vetUser.Id);
+
+        db.TeamMembers.AddRange(
+            new TeamMember { TeamId = trackTeam1.Id, PersonId = adminPerson.Id },
+            new TeamMember { TeamId = stableTeam1.Id, PersonId = stableAdmin1Person.Id },
+            new TeamMember { TeamId = stableTeam2.Id, PersonId = stableAdmin2Person.Id },
+            new TeamMember { TeamId = stableTeam1.Id, PersonId = ownerPerson.Id },
+            new TeamMember { TeamId = stableTeam1.Id, PersonId = trainerPerson.Id },
+            new TeamMember { TeamId = stableTeam1.Id, PersonId = handlerPerson.Id },
+            new TeamMember { TeamId = trackTeam1.Id, PersonId = vetPerson.Id });
+        await db.SaveChangesAsync();
 
         var racer1 = new Racer
         {
