@@ -48,6 +48,13 @@ public static class DbSeeder
         db.Stables.AddRange(stable1, stable2);
         await db.SaveChangesAsync();
 
+        var stableTeam1 = new Team { Name = stable1.Name, Type = TeamType.Stable, StableId = stable1.Id };
+        var stableTeam2 = new Team { Name = stable2.Name, Type = TeamType.Stable, StableId = stable2.Id };
+        var trackTeam1 = new Team { Name = track1.Name, Type = TeamType.Track, RacetrackId = track1.Id };
+        var trackTeam2 = new Team { Name = track2.Name, Type = TeamType.Track, RacetrackId = track2.Id };
+        db.Teams.AddRange(stableTeam1, stableTeam2, trackTeam1, trackTeam2);
+        await db.SaveChangesAsync();
+
         var admin = await EnsureUserAsync(userManager, db, "admin@racing.app", "Sam", "Trackadmin", AppRoles.TrackAdmin);
         var stableAdmin1 = await EnsureUserAsync(userManager, db, "stable@racing.app", "Steve", "Stableman", AppRoles.StableAdmin, stable1.Id);
         var stableAdmin2 = await EnsureUserAsync(userManager, db, "stable2@racing.app", "Stella", "Kennel", AppRoles.StableAdmin, stable2.Id);
@@ -56,6 +63,18 @@ public static class DbSeeder
         var handlerUser = await EnsureUserAsync(userManager, db, "handler@racing.app", "Hank", "Handler", AppRoles.Handler, stable1.Id);
         var vetUser = await EnsureUserAsync(userManager, db, "vet@racing.app", "Vince", "Vet", AppRoles.Vet);
         var fanUser = await EnsureUserAsync(userManager, db, "fan@racing.app", "Fiona", "Fan", AppRoles.Racegoer);
+
+        db.TeamMembers.AddRange(
+            new TeamMember { TeamId = stableTeam1.Id, UserId = stableAdmin1.Id, Rights = RecordRights.All },
+            new TeamMember { TeamId = stableTeam1.Id, UserId = trainerUser.Id, Rights = RecordRights.All },
+            new TeamMember { TeamId = stableTeam1.Id, UserId = handlerUser.Id, Rights = RecordRights.All },
+            new TeamMember { TeamId = stableTeam2.Id, UserId = stableAdmin2.Id, Rights = RecordRights.All },
+            new TeamMember { TeamId = trackTeam1.Id, UserId = admin.Id, Rights = RecordRights.All },
+            new TeamMember { TeamId = trackTeam2.Id, UserId = admin.Id, Rights = RecordRights.All },
+            new TeamMember { TeamId = stableTeam1.Id, UserId = ownerUser.Id, Rights = RecordRights.Read },
+            new TeamMember { TeamId = stableTeam1.Id, UserId = vetUser.Id, Rights = RecordRights.Write },
+            new TeamMember { TeamId = stableTeam1.Id, UserId = fanUser.Id, Rights = RecordRights.Read });
+        await db.SaveChangesAsync();
 
         var ownerPerson = await db.People.SingleAsync(p => p.AppUserId == ownerUser.Id);
         var trainerPerson = await db.People.SingleAsync(p => p.AppUserId == trainerUser.Id);

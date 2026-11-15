@@ -1,6 +1,6 @@
 namespace RacingApp.Shared.Entities;
 
-public class Racetrack
+public class Racetrack : IManagedRecord
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -8,9 +8,14 @@ public class Racetrack
     public int TrackLengthMeters { get; set; }
     public string? Surface { get; set; }
     public int Capacity { get; set; }
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
 
-public class Racer
+public class Racer : IManagedRecord
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -32,9 +37,14 @@ public class Racer
     public Person? Handler { get; set; }
     public List<RacerOwnership> Ownerships { get; set; } = new();
     public List<RacerAvailability> Availabilities { get; set; } = new();
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
 
-public class RacerOwnership
+public class RacerOwnership : IManagedRecord
 {
     public int Id { get; set; }
     public int RacerId { get; set; }
@@ -43,9 +53,14 @@ public class RacerOwnership
 
     public Racer? Racer { get; set; }
     public Person? Owner { get; set; }
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
 
-public class RacerAvailability
+public class RacerAvailability : IManagedRecord
 {
     public int Id { get; set; }
     public int RacerId { get; set; }
@@ -54,9 +69,14 @@ public class RacerAvailability
 
     public Racer? Racer { get; set; }
     public Racetrack? Racetrack { get; set; }
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
 
-public class RaceMeeting
+public class RaceMeeting : IManagedRecord
 {
     public int Id { get; set; }
     public int RacetrackId { get; set; }
@@ -66,9 +86,14 @@ public class RaceMeeting
 
     public Racetrack? Racetrack { get; set; }
     public List<Race> Races { get; set; } = new();
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
 
-public class Race
+public class Race : IManagedRecord
 {
     public int Id { get; set; }
     public int RaceMeetingId { get; set; }
@@ -81,9 +106,14 @@ public class Race
 
     public RaceMeeting? RaceMeeting { get; set; }
     public List<RaceEntry> Entries { get; set; } = new();
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
 
-public class RaceEntry
+public class RaceEntry : IManagedRecord
 {
     public int Id { get; set; }
     public int RaceId { get; set; }
@@ -96,4 +126,9 @@ public class RaceEntry
 
     public Race? Race { get; set; }
     public Racer? Racer { get; set; }
+    public int RecordStatus { get; set; } = 1;
+    public int? OwnerTeamId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? RecordUserId { get; set; }
 }
