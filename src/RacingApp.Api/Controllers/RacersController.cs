@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +23,7 @@ public class RacersController : ControllerBase
         var query = _db.Racers
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
+            .Include(r => r.Handler)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -34,23 +34,26 @@ public class RacersController : ControllerBase
     }
 
     [HttpGet("mine")]
-    [Authorize(Roles = $"{AppRoles.Owner},{AppRoles.Trainer}")]
     public async Task<ActionResult<IEnumerable<RacerDto>>> GetMine()
     {
-        var userId = _userManagerUserId();
+        var person = await CurrentUser.PersonAsync(_db, User);
+        if (person is null)
+            return Ok(new List<RacerDto>());
 
-        var racers = await _db.Racers
+        IQueryable<Racer> query = _db.Racers
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
-            .Include(r => r.Ownerships)
-            .ThenInclude(o => o.Owner)
-            .ToListAsync();
+            .Include(r => r.Handler);
 
-        var mine = racers.Where(r =>
-            (r.Trainer != null && r.Trainer.AppUserId == userId) ||
-            r.Ownerships.Any(o => o.Owner.AppUserId == userId));
+        if (User.IsInRole(AppRoles.Owner))
+            query = query.Where(r => r.Ownerships.Any(o => o.OwnerPersonId == person.Id));
+        else if (person.StableId is not null)
+            query = query.Where(r => r.StableId == person.StableId);
+        else
+            return Ok(new List<RacerDto>());
 
-        return mine.Select(r => r.ToDto()).ToList();
+        var racers = await query.OrderBy(r => r.Name).ToListAsync();
+        return racers.Select(r => r.ToDto()).ToList();
     }
 
     [HttpGet("{id:int}")]
@@ -59,52 +62,34 @@ public class RacersController : ControllerBase
         var racer = await _db.Racers
             .Include(r => r.Stable)
             .Include(r => r.Trainer)
-            .Include(r => r.Ownerships)
-            .ThenInclude(o => o.Owner)
-            .Include(r => r.Injuries)
-            .ThenInclude(i => i.Vet)
-            .Include(r => r.Injuries)
-            .ThenInclude(i => i.Treatments)
-            .Include(r => r.Entries)
-            .ThenInclude(e => e.Race)
-            .Include(r => r.Entries)
-            .ThenInclude(e => e.Trainer)
-            .Include(r => r.Entries)
-            .ThenInclude(e => e.Handler)
+            .Include(r => r.Handler)
+            .Include(r => r.Ownerships).ThenInclude(o => o.Owner)
+            .Include(r => r.Availabilities).ThenInclude(a => a.Racetrack)
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (racer is null)
             return NotFound();
 
-        var dto = new RacerDetailDto
-        {
-            Id = racer.Id,
-            Name = racer.Name,
-            KennelNumber = racer.KennelNumber,
-            DateOfBirth = racer.DateOfBirth,
-            Sex = racer.Sex,
-            Breed = racer.Breed,
-            Color = racer.Color,
-            MicrochipNumber = racer.MicrochipNumber,
-            WeightKg = racer.WeightKg,
-            IsRetired = racer.IsRetired,
-            StableName = racer.Stable?.Name,
-            TrainerName = racer.Trainer is null ? null : $"{racer.Trainer.FirstName} {racer.Trainer.LastName}",
-            Owners = racer.Ownerships.Where(o => o.EndDate == null).Select(o => o.ToDto()).ToList(),
-            Injuries = racer.Injuries.OrderByDescending(i => i.DateReported).Select(i => i.ToDto()).ToList(),
-            RecentEntries = racer.Entries
-                .OrderByDescending(e => e.Race.ScheduledTime)
-                .Take(10)
-                .Select(e => e.ToDto())
-                .ToList()
-        };
+        var injuries = await _db.Injuries
+            .Include(i => i.ReportedBy)
+            .Include(i => i.Treatments).ThenInclude(t => t.AdministeredBy)
+            .Where(i => i.RacerId == id)
+            .OrderByDescending(i => i.DateReported)
+            .ToListAsync();
+
+        var dto = racer.ToDetailDto();
+        dto.Injuries = injuries.Select(i => i.ToDto()).ToList();
         return dto;
     }
 
     [HttpPost]
-    [Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.Owner},{AppRoles.Trainer}")]
+    [Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.StableAdmin}")]
     public async Task<ActionResult<RacerDto>> Create(CreateRacerRequest request)
     {
+        var stableId = await ResolveStableAsync(request.StableId);
+        if (stableId is null)
+            return Forbid();
+
         var racer = new Racer
         {
             Name = request.Name,
@@ -115,44 +100,93 @@ public class RacersController : ControllerBase
             Color = request.Color,
             MicrochipNumber = request.MicrochipNumber,
             WeightKg = request.WeightKg,
-            StableId = request.StableId,
-            TrainerId = request.TrainerId
+            StableId = stableId.Value,
+            TrainerPersonId = request.TrainerPersonId,
+            HandlerPersonId = request.HandlerPersonId
         };
+
+        foreach (var share in request.Owners)
+            racer.Ownerships.Add(new RacerOwnership
+            {
+                OwnerPersonId = share.OwnerPersonId,
+                SharePercent = share.SharePercent
+            });
+
         _db.Racers.Add(racer);
         await _db.SaveChangesAsync();
 
-        if (request.OwnerId.HasValue)
-        {
-            _db.RacerOwnerships.Add(new RacerOwnership
-            {
-                RacerId = racer.Id,
-                OwnerId = request.OwnerId.Value,
-                SharePercent = 100m
-            });
-            await _db.SaveChangesAsync();
-        }
-
-        return CreatedAtAction(nameof(Get), new { id = racer.Id }, racer.ToDto());
+        racer = await LoadRacerAsync(racer.Id);
+        return CreatedAtAction(nameof(Get), new { id = racer!.Id }, racer.ToDto());
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.Trainer}")]
+    [Authorize(Roles = $"{AppRoles.TrackAdmin},{AppRoles.StableAdmin}")]
     public async Task<IActionResult> Update(int id, UpdateRacerRequest request)
     {
-        var racer = await _db.Racers.FindAsync(id);
+        var racer = await _db.Racers.Include(r => r.Ownerships).FirstOrDefaultAsync(r => r.Id == id);
         if (racer is null)
             return NotFound();
 
+        if (User.IsInRole(AppRoles.StableAdmin) && !User.IsInRole(AppRoles.TrackAdmin))
+        {
+            var person = await CurrentUser.PersonAsync(_db, User);
+            if (person?.StableId is null || racer.StableId != person.StableId)
+                return Forbid();
+        }
+
         racer.Name = request.Name;
+        racer.KennelNumber = request.KennelNumber;
+        racer.DateOfBirth = request.DateOfBirth;
+        racer.Sex = request.Sex;
         racer.Breed = request.Breed;
         racer.Color = request.Color;
+        racer.MicrochipNumber = request.MicrochipNumber;
         racer.WeightKg = request.WeightKg;
         racer.IsRetired = request.IsRetired;
         racer.StableId = request.StableId;
-        racer.TrainerId = request.TrainerId;
+        racer.TrainerPersonId = request.TrainerPersonId;
+        racer.HandlerPersonId = request.HandlerPersonId;
+
+        if (racer.TrainerPersonId.HasValue)
+        {
+            var trainerOk = await _db.People.AnyAsync(p => p.Id == racer.TrainerPersonId && p.StableId == racer.StableId);
+            if (!trainerOk)
+                return BadRequest(new { message = "Trainer must belong to the racer's stable." });
+        }
+
+        if (racer.HandlerPersonId.HasValue)
+        {
+            var handlerOk = await _db.People.AnyAsync(p => p.Id == racer.HandlerPersonId && p.StableId == racer.StableId);
+            if (!handlerOk)
+                return BadRequest(new { message = "Handler must belong to the racer's stable." });
+        }
+
+        _db.RacerOwnerships.RemoveRange(racer.Ownerships);
+        foreach (var share in request.Owners)
+            racer.Ownerships.Add(new RacerOwnership
+            {
+                RacerId = racer.Id,
+                OwnerPersonId = share.OwnerPersonId,
+                SharePercent = share.SharePercent
+            });
+
         await _db.SaveChangesAsync();
         return NoContent();
     }
 
-    private string _userManagerUserId() => User.FindFirstValue("sub") ?? string.Empty;
+    private async Task<int?> ResolveStableAsync(int? requestedStableId)
+    {
+        if (User.IsInRole(AppRoles.TrackAdmin))
+            return requestedStableId;
+
+        var person = await CurrentUser.PersonAsync(_db, User);
+        return person?.StableId;
+    }
+
+    private async Task<Racer?> LoadRacerAsync(int id) =>
+        await _db.Racers
+            .Include(r => r.Stable)
+            .Include(r => r.Trainer)
+            .Include(r => r.Handler)
+            .FirstOrDefaultAsync(r => r.Id == id);
 }

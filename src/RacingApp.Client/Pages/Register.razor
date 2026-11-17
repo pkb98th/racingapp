@@ -3,15 +3,17 @@
 <h1>Register</h1>
 
 <div class="card" style="max-width:420px">
-    <p>Public registration creates a <strong>Racegoer</strong> account. Owner, trainer, vet and track admin accounts are provisioned by the track.</p>
+    <p>Public registration creates a <strong>Racegoer</strong> account. Stable, owner, trainer, handler and vet accounts are provisioned by the track or your stable.</p>
     @if (error is not null)
     {
         <div class="alert-error">@error</div>
     }
     <EditForm Model="model" OnValidSubmit="Submit">
         <DataAnnotationsValidator />
-        <label>Full name</label>
-        <InputText @bind-Value="model.FullName" />
+        <label>First name</label>
+        <InputText @bind-Value="model.FirstName" />
+        <label>Last name</label>
+        <InputText @bind-Value="model.LastName" />
         <label>Email</label>
         <InputText @bind-Value="model.Email" />
         <label>Password</label>

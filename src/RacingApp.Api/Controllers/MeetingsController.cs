@@ -22,7 +22,6 @@ public class MeetingsController : ControllerBase
     {
         var meetings = await _db.RaceMeetings
             .Include(m => m.Racetrack)
-            .Include(m => m.Races)
             .OrderBy(m => m.Date)
             .ToListAsync();
         return meetings.Select(m => m.ToDto()).ToList();
@@ -31,19 +30,7 @@ public class MeetingsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<RaceMeetingDto>> Get(int id)
     {
-        var meeting = await _db.RaceMeetings
-            .Include(m => m.Racetrack)
-            .Include(m => m.Races)
-            .ThenInclude(r => r.Entries)
-            .ThenInclude(e => e.Racer)
-            .Include(m => m.Races)
-            .ThenInclude(r => r.Entries)
-            .ThenInclude(e => e.Trainer)
-            .Include(m => m.Races)
-            .ThenInclude(r => r.Entries)
-            .ThenInclude(e => e.Handler)
-            .FirstOrDefaultAsync(m => m.Id == id);
-
+        var meeting = await LoadMeetingAsync(id);
         return meeting is null ? NotFound() : meeting.ToDto(includeRaces: true);
     }
 
@@ -51,8 +38,7 @@ public class MeetingsController : ControllerBase
     [Authorize(Roles = AppRoles.TrackAdmin)]
     public async Task<ActionResult<RaceMeetingDto>> Create(CreateMeetingRequest request)
     {
-        var trackExists = await _db.Racetracks.AnyAsync(t => t.Id == request.RacetrackId);
-        if (!trackExists)
+        if (!await _db.Racetracks.AnyAsync(t => t.Id == request.RacetrackId))
             return BadRequest(new { message = "Unknown racetrack." });
 
         var meeting = new RaceMeeting
@@ -64,7 +50,9 @@ public class MeetingsController : ControllerBase
         };
         _db.RaceMeetings.Add(meeting);
         await _db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id = meeting.Id }, meeting.ToDto());
+
+        var created = await LoadMeetingAsync(meeting.Id);
+        return CreatedAtAction(nameof(Get), new { id = meeting.Id }, created!.ToDto());
     }
 
     [HttpPut("{id:int}/status")]
@@ -79,4 +67,10 @@ public class MeetingsController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    private async Task<RaceMeeting?> LoadMeetingAsync(int id) =>
+        await _db.RaceMeetings
+            .Include(m => m.Racetrack)
+            .Include(m => m.Races).ThenInclude(r => r.Entries).ThenInclude(e => e.Racer).ThenInclude(r => r!.Stable)
+            .FirstOrDefaultAsync(m => m.Id == id);
 }

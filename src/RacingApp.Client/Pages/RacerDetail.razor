@@ -8,26 +8,107 @@
 }
 else
 {
-    <h1>@racer.Name</h1>
+    <h1>@racer.Name @if (racer.IsRetired)
+    {
+        <span class="badge">Retired</span>
+    }</h1>
+    <p>
+        @racer.Sex &middot; @racer.AgeYears years &middot; @racer.WeightKg.ToString("0.0") kg
+        @if (!string.IsNullOrEmpty(racer.Breed))
+        {
+            <span>&middot; @racer.Breed</span>
+        }
+        @if (!string.IsNullOrEmpty(racer.Color))
+        {
+            <span>&middot; @racer.Color</span>
+        }
+        @if (!string.IsNullOrEmpty(racer.MicrochipNumber))
+        {
+            <span>&middot; Chip @racer.MicrochipNumber</span>
+        }
+    </p>
+    <p>
+        Stable: <strong>@racer.StableName</strong>
+        @if (!string.IsNullOrEmpty(racer.TrainerName))
+        {
+            <span>&middot; Trainer: @racer.TrainerName</span>
+        }
+        @if (!string.IsNullOrEmpty(racer.HandlerName))
+        {
+            <span>&middot; Handler: @racer.HandlerName</span>
+        }
+    </p>
+
+    <AuthorizeView Context="auth" Roles="StableAdmin">
+        @if (canManage)
+        {
+            <div class="card">
+                <h3>Availability flags</h3>
+                <p>Tell the track which meetings this racer can enter. The track can only enter racers flagged available.</p>
+                @if (availabilityError is not null)
+                {
+                    <div class="alert-error">@availabilityError</div>
+                }
+                <table>
+                    <thead>
+                        <tr><th>Racetrack</th><th>Available</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var track in tracks)
+                        {
+                            var flag = racer.Availabilities.FirstOrDefault(a => a.RacetrackId == track.Id);
+                            var isAvailable = flag?.IsAvailable ?? false;
+                            <tr>
+                                <td>@track.Name</td>
+                                <td>
+                                    @if (isAvailable)
+                                    {
+                                        <span class="badge ok">Available</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge">Not flagged</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="secondary" @onclick="() => ToggleAvailability(track.Id, !isAvailable)">
+                                        @(isAvailable ? "Withdraw" : "Make available")
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </AuthorizeView>
+
     <div class="card">
-        <table>
-            <tbody>
-                <tr><th style="width:180px">Kennel number</th><td>@racer.KennelNumber</td></tr>
-                <tr><th>Date of birth</th><td>@racer.DateOfBirth.ToString("dd MMM yyyy") (@racer.AgeYears years)</td></tr>
-                <tr><th>Sex</th><td>@racer.Sex</td></tr>
-                <tr><th>Breed / color</th><td>@racer.Breed / @racer.Color</td></tr>
-                <tr><th>Microchip</th><td>@racer.MicrochipNumber</td></tr>
-                <tr><th>Weight</th><td>@racer.WeightKg.ToString("0.0") kg</td></tr>
-                <tr><th>Stable</th><td>@racer.StableName</td></tr>
-                <tr><th>Trainer</th><td>@racer.TrainerName</td></tr>
-                <tr><th>Owners</th><td>@(ownersText.Length > 0 ? ownersText : "Unassigned")</td></tr>
-            </tbody>
-        </table>
+        <h3>Owners</h3>
+        @if (racer.Owners.Count == 0)
+        {
+            <p>No owners recorded.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Owner</th><th>Share</th></tr></thead>
+                <tbody>
+                    @foreach (var owner in racer.Owners)
+                    {
+                        <tr>
+                            <td>@owner.OwnerName</td>
+                            <td>@owner.SharePercent.ToString("0.#")%</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
     </div>
 
-    <AuthorizeView Roles="Vet,Trainer">
+    <AuthorizeView Context="auth" Roles="Vet,Trainer,StableAdmin">
         <div class="card">
-            <h3>Report injury</h3>
+            <h3>Record injury</h3>
             @if (injuryError is not null)
             {
                 <div class="alert-error">@injuryError</div>
@@ -46,112 +127,91 @@ else
                     <div>
                         <label>Severity</label>
                         <InputSelect @bind-Value="injuryRequest.Severity">
-                            <option value="Minor">Minor</option>
-                            <option value="Moderate">Moderate</option>
-                            <option value="Severe">Severe</option>
+                            <option value="@InjurySeverity.Minor">Minor</option>
+                            <option value="@InjurySeverity.Moderate">Moderate</option>
+                            <option value="@InjurySeverity.Severe">Severe</option>
                         </InputSelect>
                     </div>
                 </div>
-                <button type="submit">Report</button>
+                <button type="submit">Record injury</button>
             </EditForm>
         </div>
     </AuthorizeView>
 
-    <h2>Injury history</h2>
-    @if (!racer.Injuries.Any())
-    {
-        <p>No injuries on record.</p>
-    }
-    @foreach (var injury in racer.Injuries)
-    {
-        <div class="card">
-            <h3>
-                <span class="badge @(injury.Severity == InjurySeverity.Severe ? "bad" : injury.Severity == InjurySeverity.Moderate ? "warn" : "ok")">@injury.Severity</span>
-                <span class="badge">@injury.Status</span>
-                @injury.DateReported.ToString("dd MMM yyyy")
-            </h3>
-            <p><strong>@injury.BodyPart</strong> &mdash; @injury.Description (@(injury.VetName ?? "unassigned vet"))</p>
-            @if (injury.Treatments.Any())
+    <div class="card">
+        <h3>Injuries &amp; treatments</h3>
+        @if (racer.Injuries.Count == 0)
+        {
+            <p>No injuries recorded.</p>
+        }
+        else
+        {
+            @foreach (var injury in racer.Injuries)
             {
-                <table>
-                    <thead>
-                        <tr><th>Date</th><th>Treatment</th><th>Medication</th><th>Dosage</th><th>Withdrawal (days)</th><th>Follow-up</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var t in injury.Treatments)
-                        {
-                            <tr>
-                                <td>@t.DateAdministered.ToString("dd MMM yyyy")</td>
-                                <td>@t.Description</td>
-                                <td>@t.Medication</td>
-                                <td>@t.Dosage</td>
-                                <td>@t.WithdrawalPeriodDays</td>
-                                <td>@(t.FollowUpDate?.ToString("dd MMM yyyy") ?? "-")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                <h4>@injury.DateReported.ToString("dd MMM yyyy") &mdash; @injury.Description <span class="badge">@injury.Severity</span> <span class="badge">@injury.Status</span></h4>
+                @if (!string.IsNullOrEmpty(injury.BodyPart))
+                {
+                    <p>Affected: @injury.BodyPart @(injury.ReportedByName is null ? "" : $"(reported by {injury.ReportedByName})")</p>
+                }
+                @if (injury.Treatments.Count > 0)
+                {
+                    <table>
+                        <thead><tr><th>Date</th><th>Treatment</th><th>Medication</th><th>Dosage</th><th>Withdrawal (days)</th><th>Vet</th></tr></thead>
+                        <tbody>
+                            @foreach (var treatment in injury.Treatments)
+                            {
+                                <tr>
+                                    <td>@treatment.DateAdministered.ToString("dd MMM yyyy")</td>
+                                    <td>@treatment.Description</td>
+                                    <td>@treatment.Medication</td>
+                                    <td>@treatment.Dosage</td>
+                                    <td>@treatment.WithdrawalPeriodDays</td>
+                                    <td>@treatment.AdministeredByName</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                <AuthorizeView Context="auth" Roles="Vet">
+                    <button class="secondary" @onclick="() => BeginTreatment(injury)">Record treatment</button>
+                    @if (treatmentInjuryId == injury.Id)
+                    {
+                        <EditForm Model="treatmentRequest" OnValidSubmit="SaveTreatment">
+                            <DataAnnotationsValidator />
+                            <div class="form-grid">
+                                <div>
+                                    <label>Date administered</label>
+                                    <InputDate Type="InputDateType.Date" @bind-Value="treatmentRequest.DateAdministered" />
+                                </div>
+                                <div>
+                                    <label>Description</label>
+                                    <InputText @bind-Value="treatmentRequest.Description" />
+                                </div>
+                                <div>
+                                    <label>Medication</label>
+                                    <InputText @bind-Value="treatmentRequest.Medication" />
+                                </div>
+                                <div>
+                                    <label>Dosage</label>
+                                    <InputText @bind-Value="treatmentRequest.Dosage" />
+                                </div>
+                                <div>
+                                    <label>Withdrawal period (days)</label>
+                                    <InputNumber @bind-Value="treatmentRequest.WithdrawalPeriodDays" />
+                                </div>
+                                <div>
+                                    <label>Follow-up date</label>
+                                    <InputDate Type="InputDateType.Date" @bind-Value="treatmentRequest.FollowUpDate" />
+                                </div>
+                            </div>
+                            <button type="submit">Save treatment</button>
+                            <button type="button" class="secondary" @onclick="() => treatmentInjuryId = null">Cancel</button>
+                        </EditForm>
+                    }
+                </AuthorizeView>
             }
-            <AuthorizeView Roles="Vet">
-                <button class="secondary" @onclick="() => BeginTreatment(injury)">Record treatment</button>
-                @if (treatmentInjuryId == injury.Id)
-                {
-                    <EditForm Model="treatmentRequest" OnValidSubmit="CreateTreatment">
-                        <DataAnnotationsValidator />
-                        <div class="form-grid">
-                            <div>
-                                <label>Description</label>
-                                <InputText @bind-Value="treatmentRequest.Description" />
-                            </div>
-                            <div>
-                                <label>Medication</label>
-                                <InputText @bind-Value="treatmentRequest.Medication" />
-                            </div>
-                            <div>
-                                <label>Dosage</label>
-                                <InputText @bind-Value="treatmentRequest.Dosage" />
-                            </div>
-                            <div>
-                                <label>Withdrawal period (days)</label>
-                                <InputNumber @bind-Value="treatmentRequest.WithdrawalPeriodDays" />
-                            </div>
-                            <div>
-                                <label>Follow-up date</label>
-                                <InputDate Type="InputDateType.Date" @bind-Value="treatmentRequest.FollowUpDate" />
-                            </div>
-                        </div>
-                        <button type="submit">Save treatment</button>
-                        <button type="button" class="secondary" @onclick="() => treatmentInjuryId = 0">Cancel</button>
-                    </EditForm>
-                }
-            </AuthorizeView>
-        </div>
-    }
-
-    <h2>Recent race entries</h2>
-    @if (!racer.RecentEntries.Any())
-    {
-        <p>No race entries.</p>
-    }
-    else
-    {
-        <table>
-            <thead>
-                <tr><th>Trap</th><th>Status</th><th>Finish</th><th>Time (s)</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var entry in racer.RecentEntries)
-                {
-                    <tr>
-                        <td>@entry.TrapNumber</td>
-                        <td>@entry.Status</td>
-                        <td>@(entry.FinishPosition?.ToString() ?? "-")</td>
-                        <td>@(entry.RaceTimeSeconds?.ToString("0.00") ?? "-")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+        }
+    </div>
 }
 
 @code {
@@ -159,33 +219,62 @@ else
     public int Id { get; set; }
 
     private RacerDetailDto? racer;
-    private string ownersText = string.Empty;
+    private List<RacetrackDto> tracks = new();
+    private bool canManage;
+    private string? availabilityError;
 
     private CreateInjuryRequest injuryRequest = new();
     private string? injuryError;
 
-    private int treatmentInjuryId;
+    private int? treatmentInjuryId;
     private CreateTreatmentRequest treatmentRequest = new();
+    private string? treatmentError;
+
+    [Inject]
+    private AuthenticationStateProvider AuthState { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthState.GetAuthenticationStateAsync();
+        canManage = authState.User.IsInRole(AppRoles.StableAdmin);
+
+        tracks = await Api.GetRacetracksAsync();
         racer = await Api.GetRacerAsync(Id);
-        if (racer is not null)
+        if (racer is null)
+            Nav.NavigateTo("racers");
+    }
+
+    private async Task ToggleAvailability(int racetrackId, bool isAvailable)
+    {
+        availabilityError = null;
+        try
         {
-            injuryRequest.RacerId = Id;
-            ownersText = string.Join(", ", racer.Owners.Select(o => $"{o.OwnerName} ({o.SharePercent:0.#}%)"));
+            await Api.SetAvailabilityAsync(new SetAvailabilityRequest
+            {
+                RacerId = Id,
+                RacetrackId = racetrackId,
+                IsAvailable = isAvailable
+            });
+            racer = await Api.GetRacerAsync(Id);
+        }
+        catch (ApiError ex)
+        {
+            availabilityError = ex.Message;
         }
     }
 
     private async Task CreateInjury()
     {
         injuryError = null;
+        injuryRequest.RacerId = Id;
         try
         {
             await Api.CreateInjuryAsync(injuryRequest);
             injuryRequest = new CreateInjuryRequest { RacerId = Id };
             racer = await Api.GetRacerAsync(Id);
-            ownersText = string.Join(", ", racer!.Owners.Select(o => $"{o.OwnerName} ({o.SharePercent:0.#}%)"));
         }
         catch (ApiError ex)
         {
@@ -197,20 +286,20 @@ else
     {
         treatmentInjuryId = injury.Id;
         treatmentRequest = new CreateTreatmentRequest { InjuryId = injury.Id };
+        treatmentError = null;
     }
 
-    private async Task CreateTreatment()
+    private async Task SaveTreatment()
     {
         try
         {
             await Api.CreateTreatmentAsync(treatmentRequest);
-            treatmentInjuryId = 0;
+            treatmentInjuryId = null;
             racer = await Api.GetRacerAsync(Id);
-            ownersText = string.Join(", ", racer!.Owners.Select(o => $"{o.OwnerName} ({o.SharePercent:0.#}%)"));
         }
         catch (ApiError ex)
         {
-            injuryError = ex.Message;
+            treatmentError = ex.Message;
         }
     }
 }

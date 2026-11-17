@@ -11,8 +11,11 @@ using RacingApp.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddRazorPages();
 
 var dbProvider = builder.Configuration["Database:Provider"] ?? "SqlServer";
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -29,7 +32,8 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+    .AddDefaultTokenProviders()
+    .AddSignInManager();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "RacingApp";
@@ -84,7 +88,7 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-
+builder.Services.AddRazorPages();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -107,6 +111,12 @@ if (app.Environment.IsDevelopment())
 app.UseCors(CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
 app.MapControllers();
+app.MapRazorPages();
+app.MapFallbackToFile("index.html");
+
 
 app.Run();

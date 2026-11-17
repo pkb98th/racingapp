@@ -22,30 +22,18 @@ public class RacesController : ControllerBase
     {
         var races = await _db.Races
             .Where(r => r.RaceMeetingId == meetingId)
-            .Include(r => r.Entries)
-            .ThenInclude(e => e.Racer)
-            .Include(r => r.Entries)
-            .ThenInclude(e => e.Trainer)
-            .Include(r => r.Entries)
-            .ThenInclude(e => e.Handler)
             .OrderBy(r => r.RaceNumber)
             .ToListAsync();
-
-        return races.Select(r => r.ToDto(includeEntries: true)).ToList();
+        return races.Select(r => r.ToDto()).ToList();
     }
 
     [HttpPost]
     [Authorize(Roles = AppRoles.TrackAdmin)]
     public async Task<ActionResult<RaceDto>> Create(CreateRaceRequest request)
     {
-        var meetingExists = await _db.RaceMeetings.AnyAsync(m => m.Id == request.RaceMeetingId);
-        if (!meetingExists)
-            return BadRequest(new { message = "Unknown race meeting." });
-
-        var duplicate = await _db.Races.AnyAsync(r =>
-            r.RaceMeetingId == request.RaceMeetingId && r.RaceNumber == request.RaceNumber);
-        if (duplicate)
-            return Conflict(new { message = "A race with this number already exists in the meeting." });
+        var meeting = await _db.RaceMeetings.FindAsync(request.RaceMeetingId);
+        if (meeting is null)
+            return BadRequest(new { message = "Unknown meeting." });
 
         var race = new Race
         {
@@ -54,11 +42,13 @@ public class RacesController : ControllerBase
             DistanceMeters = request.DistanceMeters,
             Grade = request.Grade,
             PrizeMoney = request.PrizeMoney,
-            ScheduledTime = request.ScheduledTime
+            ScheduledTime = request.ScheduledTime,
+            Status = RaceStatus.Scheduled
         };
         _db.Races.Add(race);
         await _db.SaveChangesAsync();
-        return Ok(race.ToDto());
+
+        return CreatedAtAction(nameof(GetByMeeting), new { meetingId = race.RaceMeetingId }, race.ToDto());
     }
 
     [HttpPut("{id:int}/status")]
@@ -78,7 +68,7 @@ public class RacesController : ControllerBase
     [Authorize(Roles = AppRoles.TrackAdmin)]
     public async Task<IActionResult> Delete(int id)
     {
-        var race = await _db.Races.Include(r => r.Entries).FirstOrDefaultAsync(r => r.Id == id);
+        var race = await _db.Races.FindAsync(id);
         if (race is null)
             return NotFound();
 

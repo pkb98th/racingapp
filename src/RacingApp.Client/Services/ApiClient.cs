@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using RacingApp.Shared;
+using RacingApp.Shared.Dtos;
 
 namespace RacingApp.Client.Services;
 
@@ -48,11 +50,36 @@ public class ApiClient
     public async Task<RacerDto?> CreateRacerAsync(CreateRacerRequest request) =>
         await PostAsync<RacerDto>("api/racers", request);
 
+    public async Task UpdateRacerAsync(int id, UpdateRacerRequest request) =>
+        await PutEmptyAsync($"api/racers/{id}", request);
+
     public async Task<List<RacetrackDto>> GetRacetracksAsync() =>
         await GetAsync<List<RacetrackDto>>("api/racetracks") ?? new();
 
     public async Task<RacetrackDto?> CreateRacetrackAsync(CreateRacetrackRequest request) =>
         await PostAsync<RacetrackDto>("api/racetracks", request);
+
+    public async Task<List<StableDto>> GetStablesAsync() =>
+        await GetAsync<List<StableDto>>("api/stables") ?? new();
+
+    public async Task<StableDto?> GetMyStableAsync() =>
+        await GetAsync<StableDto>("api/stables/mine");
+
+    public async Task<StableDto?> CreateStableAsync(CreateStableRequest request) =>
+        await PostAsync<StableDto>("api/stables", request);
+
+    public async Task<List<AvailabilityDto>> GetAvailabilitiesAsync(int? trackId = null, bool? available = null)
+    {
+        var url = "api/availabilities";
+        var query = new List<string>();
+        if (trackId.HasValue) query.Add($"trackId={trackId.Value}");
+        if (available.HasValue) query.Add($"available={available.Value.ToString().ToLower()}");
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+        return await GetAsync<List<AvailabilityDto>>(url) ?? new();
+    }
+
+    public async Task SetAvailabilityAsync(SetAvailabilityRequest request) =>
+        await PutEmptyAsync("api/availabilities", request);
 
     public async Task<List<InjuryDto>> GetInjuriesAsync(int? racerId = null) =>
         await GetAsync<List<InjuryDto>>(racerId.HasValue ? $"api/injuries?racerId={racerId.Value}" : "api/injuries") ?? new();
@@ -66,35 +93,14 @@ public class ApiClient
     public async Task<TreatmentDto?> CreateTreatmentAsync(CreateTreatmentRequest request) =>
         await PostAsync<TreatmentDto>("api/treatments", request);
 
-    public async Task<List<OwnerDto>> GetOwnersAsync() =>
-        await GetAsync<List<OwnerDto>>("api/owners") ?? new();
+    public async Task<List<UserDto>> GetUsersAsync() =>
+        await GetAsync<List<UserDto>>("api/users") ?? new();
 
-    public async Task<OwnerDto?> CreateOwnerAsync(CreateOwnerRequest request) =>
-        await PostAsync<OwnerDto>("api/owners", request);
+    public async Task<UserDto?> CreateUserAsync(CreateUserRequest request) =>
+        await PostAsync<UserDto>("api/users", request);
 
-    public async Task<List<TrainerDto>> GetTrainersAsync() =>
-        await GetAsync<List<TrainerDto>>("api/trainers") ?? new();
-
-    public async Task<TrainerDto?> CreateTrainerAsync(CreateTrainerRequest request) =>
-        await PostAsync<TrainerDto>("api/trainers", request);
-
-    public async Task<List<VetDto>> GetVetsAsync() =>
-        await GetAsync<List<VetDto>>("api/vets") ?? new();
-
-    public async Task<VetDto?> CreateVetAsync(CreateVetRequest request) =>
-        await PostAsync<VetDto>("api/vets", request);
-
-    public async Task<List<HandlerDto>> GetHandlersAsync() =>
-        await GetAsync<List<HandlerDto>>("api/handlers") ?? new();
-
-    public async Task<HandlerDto?> CreateHandlerAsync(CreateHandlerRequest request) =>
-        await PostAsync<HandlerDto>("api/handlers", request);
-
-    public async Task<List<StableDto>> GetStablesAsync() =>
-        await GetAsync<List<StableDto>>("api/stables") ?? new();
-
-    public async Task<StableDto?> CreateStableAsync(CreateStableRequest request) =>
-        await PostAsync<StableDto>("api/stables", request);
+    public async Task SetUserRoleAsync(string id, string role) =>
+        await PutEmptyAsync($"api/users/{id}/role", new SetRoleRequest { Role = role });
 
     private async Task SetAuthHeaderAsync()
     {
@@ -120,13 +126,6 @@ public class ApiClient
         var response = await _http.PostAsJsonAsync(url, body);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<T>();
-    }
-
-    private async Task PostEmptyAsync(string url, object body)
-    {
-        await SetAuthHeaderAsync();
-        var response = await _http.PostAsJsonAsync(url, body);
-        await EnsureSuccessAsync(response);
     }
 
     private async Task PutEmptyAsync(string url, object body)
