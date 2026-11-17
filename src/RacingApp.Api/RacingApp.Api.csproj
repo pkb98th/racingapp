@@ -15,11 +15,13 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RacingApp.Client\RacingApp.Client.csproj" />
     <ProjectReference Include="..\RacingApp.Shared\RacingApp.Shared.csproj" />
   </ItemGroup>
 

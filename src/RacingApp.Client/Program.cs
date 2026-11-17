@@ -16,12 +16,12 @@ builder.Services.AddScoped<CustomAuthStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<CustomAuthStateProvider>());
 builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    var baseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5080/";
+    var baseUrl = builder.Configuration["ApiBaseUrl"] ?? "/";
     client.BaseAddress = new Uri(baseUrl);
 });
 builder.Services.AddHttpClient<AuthService>(client =>
 {
-    var baseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5080/";
+    var baseUrl = builder.Configuration["ApiBaseUrl"] ?? "/";
     client.BaseAddress = new Uri(baseUrl);
 });
 
